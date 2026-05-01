@@ -5,6 +5,7 @@ import { getNoteSourceFileName, formatNoteTargetLocation, formatNoteTimestamp, c
 import {
   BookmarkDialog,
   CommandPalette,
+  ConfirmDialog,
   TagBrowserDialog,
   VersionHistoryDialog,
   BrokenLinksDialog,
@@ -41,11 +42,13 @@ import {
   getRecentPrimaryActivity,
   mergeRecentDocuments,
   toRecentDocumentPayload,
+  togglePinnedRecentDocument,
 } from "./recentDocuments";
 import { resolveSelectedNoteNodeId } from "./noteSelection";
 import {
   composeScopedSearchQuery,
   consumeScopedSearchInputWithCurrentScopes,
+  consumeScopedSearchInputWithDefaultSection,
   getScopeTokenSuggestions,
 } from "./searchScope";
 import { buildWorkspaceBackupSnapshot, getWorkspaceBackupSnapshotFingerprint } from "./restorePoints";
@@ -53,6 +56,7 @@ import { buildSearchIndex, buildSearchEntries } from "./searchIndex";
 import { createSyncEntryId, enqueueSyncEntry, loadSyncQueue, removeSyncEntry } from "./syncQueue";
 import type {
   BookmarkDialogState,
+  BookmarkFolder,
   BookmarkItem,
   BookmarkLeaf,
   BookmarkNode,
@@ -64,19 +68,23 @@ import type {
   NoteCreationDialogState,
   NoteFolderNode,
   NoteLeafNode,
+  NoteTreeNode,
   NoteUploadTarget,
   QuickCaptureState,
   RecentDocumentEntry,
   RecentDocumentSeed,
+  RestorePointSummary,
   SavedSearch,
   SearchEntry,
   SectionId,
   SidebarOrderResponse,
   SmartFolder,
+  TodoItem,
   TodoPayload,
   TodoStatus,
   TrashEntry,
   UnfurlResponse,
+  ViewerContent,
   WorkspaceInfo,
   WorkspaceBackupSnapshot,
 } from "./types";
@@ -87,11 +95,13 @@ import { useNotesData } from "./useNotesData";
 import { useRecentDocumentsState } from "./useRecentDocumentsState";
 import {
   buildTodoPayload,
+  createDefaultTodoItem,
   getDueTodoReminders,
   getTodoRecentPreview,
   normalizeTodoItems,
   removeTodoItems,
   reorderTodoItems,
+  spawnNextRecurrence,
   updateTodoItems,
 } from "./todoState";
 import { useTodoData } from "./useTodoData";
@@ -387,10 +397,12 @@ function buildBrokenLinks(allNotes: Note[]): Map<string, string[]> {
   for (const note of allNotes) {
     if (!note.sourcePath) continue;
     const broken: string[] = [];
-    const mdLinkPattern = /\[([^\]]*)\]\(([^)]+)\)/g;
+    const mdLinkPattern = /(!?)\[([^\]]*)\]\(([^)]+)\)/g;
     let match: RegExpExecArray | null;
     while ((match = mdLinkPattern.exec(note.content)) !== null) {
-      const href = match[2];
+      const isImage = match[1] === "!";
+      const href = match[3];
+      if (isImage) continue; // images are assets, not note links
       if (!href || href.startsWith("http") || href.startsWith("#") || href.startsWith("mailto:")) continue;
       // Resolve relative to note's directory
       const noteDir = note.sourcePath.split("/").slice(0, -1).join("/");
@@ -519,6 +531,7 @@ function App() {
   const [isSearchScopePopupDismissed, setIsSearchScopePopupDismissed] = useState(false);
   const [activeSearchScopeSuggestionIndex, setActiveSearchScopeSuggestionIndex] = useState(0);
   const [isNoteEditing, setIsNoteEditing] = useState(false);
+  const [trashConfirmNote, setTrashConfirmNote] = useState<Note | null>(null);
   const [pendingCreatedNoteSourcePath, setPendingCreatedNoteSourcePath] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [immersiveZoomPercent, setImmersiveZoomPercent] = useState(100);
@@ -1196,7 +1209,7 @@ function App() {
           <button
             aria-label="Move to trash"
             className="icon-action"
-            onClick={() => { if (selectedNote) void handleTrashNote(selectedNote); }}
+            onClick={() => { if (selectedNote) setTrashConfirmNote(selectedNote); }}
             title="Move to trash"
             type="button"
           >
@@ -2311,6 +2324,10 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       onSetSectionColor={section === "notes" ? handleSetNoteSectionColor : undefined}
       onSelectFolder={navigateNoteSelection}
       onRenameNote={section === "notes" ? handleRenameNoteFile : undefined}
+      onEditNote={(note) => {
+        navigateNoteSelection(note.id);
+        handleStartNoteEditing();
+      }}
       onOpenNoteHistory={(note) => {
         setVersionHistoryNote(note);
         setIsVersionHistoryOpen(true);
@@ -2710,7 +2727,6 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       }
       setNoteSaveState("saved");
       setNotesStatus("queued" in result && result.queued ? `${selectedNote.title} queued for sync` : `Saved ${selectedNote.title}`);
-      setIsNoteEditing(false);
       window.setTimeout(() => setNoteSaveState((current) => (current === "saved" ? "idle" : current)), 1400);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to save note";
@@ -5627,6 +5643,15 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
             setIsSearchPanelOpen(true);
             setIsTagBrowserOpen(false);
           }}
+        />
+      ) : null}
+      {trashConfirmNote ? (
+        <ConfirmDialog
+          message={`Move "${trashConfirmNote.title}" to trash?`}
+          confirmLabel="Move to trash"
+          cancelLabel="No, keep it"
+          onConfirm={() => { void handleTrashNote(trashConfirmNote); setTrashConfirmNote(null); }}
+          onCancel={() => setTrashConfirmNote(null)}
         />
       ) : null}
       {isVersionHistoryOpen && versionHistoryNote ? (

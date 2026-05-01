@@ -1219,7 +1219,7 @@ async function handleDocsFile(url, request, response) {
       return;
     }
 
-    const absolutePath = resolveNoteAbsolutePath(relativePath);
+    const absolutePath = resolveNoteAssetAbsolutePath(relativePath);
     const fileInfo = await stat(absolutePath);
 
     if (!fileInfo.isFile()) {
@@ -2146,6 +2146,34 @@ async function ensureDocsDirectory() {
  * Resolve a note's relative sourcePath to an absolute filesystem path.
  * Handles both primary docs folder paths and __imported__/folderName/... paths.
  */
+function resolveNoteAssetAbsolutePath(relativePath) {
+  const importedPrefix = "__imported__/";
+  const normalized = normalizeRelativeDocsPath(relativePath);
+
+  if (normalized.startsWith(importedPrefix)) {
+    const rest = normalized.slice(importedPrefix.length);
+    const slashIndex = rest.indexOf("/");
+    if (slashIndex === -1) throw new Error("Invalid imported note path");
+    const folderName = rest.slice(0, slashIndex);
+    const innerPath = rest.slice(slashIndex + 1);
+    const matchingDir = additionalDocsDirs.find((d) => path.basename(d) === folderName);
+    if (!matchingDir) throw new Error(`Imported folder "${folderName}" is not registered`);
+    const absolutePath = path.resolve(matchingDir, innerPath);
+    const normalizedDir = path.resolve(matchingDir);
+    if (!absolutePath.startsWith(`${normalizedDir}${path.sep}`) && absolutePath !== normalizedDir) {
+      throw new Error("Asset path must stay inside the imported folder");
+    }
+    return absolutePath;
+  }
+
+  const absolutePath = path.resolve(docsDir, normalized);
+  const normalizedDocsRoot = path.resolve(docsDir);
+  const insideDocs =
+    absolutePath === normalizedDocsRoot || absolutePath.startsWith(`${normalizedDocsRoot}${path.sep}`);
+  if (!insideDocs) throw new Error("Asset path must stay inside docs folder");
+  return absolutePath;
+}
+
 function resolveNoteAbsolutePath(normalizedPath) {
   const importedPrefix = "__imported__/";
   if (normalizedPath.startsWith(importedPrefix)) {
