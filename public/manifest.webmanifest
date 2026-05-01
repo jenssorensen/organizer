@@ -1,0 +1,22 @@
+{
+  "name": "Organizer",
+  "short_name": "Organizer",
+  "description": "Personal organizer for notes, bookmarks, and todos.",
+  "theme_color": "#121725",
+  "background_color": "#121725",
+  "display": "standalone",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/assets/organizer.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/organizer.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
