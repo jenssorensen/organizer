@@ -1173,6 +1173,17 @@ a {
   background: rgba(120, 230, 198, 0.12);
 }
 
+.mini-action.is-danger {
+  border-color: rgba(220, 80, 80, 0.4);
+  background: rgba(220, 80, 80, 0.1);
+  color: #e07070;
+}
+
+.mini-action.is-danger:hover {
+  border-color: rgba(220, 80, 80, 0.65);
+  background: rgba(220, 80, 80, 0.2);
+}
+
 .mini-action[disabled] {
   opacity: 0.46;
   color: var(--muted);

@@ -28,7 +28,7 @@ import ruby from "react-syntax-highlighter/dist/esm/languages/prism/ruby";
 import swift from "react-syntax-highlighter/dist/esm/languages/prism/swift";
 import yaml from "react-syntax-highlighter/dist/esm/languages/prism/yaml";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Bold, Check, CheckSquare2, Copy, Eye, EyeOff, Italic, Link2, List, Minus, Pencil, Plus, Trash2, SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
+import { Bold, Check, CheckSquare2, Copy, Eye, EyeOff, IndentDecrease, Italic, Link2, List, Minus, Pencil, Pilcrow, Plus, Sigma, TableOfContents, Trash2, SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
 import { getMarkdownLinkAttributes } from "../markdownLinks";
 import {
   clampEditorSplitPercent,
@@ -40,12 +40,18 @@ import type { UnfurlResponse } from "../types";
 function resolveNoteAssetUrl(src: string, noteSourcePath: string | undefined): string {
   if (!src || !noteSourcePath) return src;
   if (/^https?:\/\/|^data:/i.test(src)) return src;
-  if (src.startsWith("/")) return src;
+  if (src.startsWith("/") || src.startsWith("#")) return src;
+
+  // Decode percent-encoding first (remark encodes backslashes as %5C),
+  // then normalize Windows backslashes and strip leading .\ or ./
+  let decoded = src;
+  try { decoded = decodeURIComponent(src); } catch { /* keep original */ }
+  const normalizedSrc = decoded.replace(/\\/g, "/").replace(/^\.\//, "");
 
   const noteDir = noteSourcePath.includes("/")
     ? noteSourcePath.slice(0, noteSourcePath.lastIndexOf("/"))
     : "";
-  const assetPath = noteDir ? `${noteDir}/${src}` : src;
+  const assetPath = noteDir ? `${noteDir}/${normalizedSrc}` : normalizedSrc;
   return `/api/docs/file?path=${encodeURIComponent(assetPath)}`;
 }
 
@@ -799,6 +805,66 @@ function MarkdownEditor({
     setIsHeadingMenuOpen(false);
   }
 
+  function outdentSelectedLines() {
+    withSelection(({ value, selectionStart, selectionEnd }) => {
+      const blockStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
+      const blockEndIndex = value.indexOf("\n", selectionEnd);
+      const blockEnd = blockEndIndex === -1 ? value.length : blockEndIndex;
+      const lines = value.slice(blockStart, blockEnd).split("\n");
+      const outdented = lines.map((line) => line.startsWith("    ") ? line.slice(4) : line.startsWith("  ") ? line.slice(2) : line.startsWith("\t") ? line.slice(1) : line);
+      const nextBlock = outdented.join("\n");
+      const nextValue = value.slice(0, blockStart) + nextBlock + value.slice(blockEnd);
+      return { value: nextValue, selectionStart: blockStart, selectionEnd: blockStart + nextBlock.length };
+    });
+  }
+
+  function insertMath() {
+    withSelection(({ value, selectionStart, selectionEnd, selectedText }) => {
+      const before = value.slice(0, selectionStart);
+      const after = value.slice(selectionEnd);
+      const inner = selectedText || "expression";
+      const nextValue = `${before}$${inner}$${after}`;
+      return { value: nextValue, selectionStart: selectionStart + 1, selectionEnd: selectionStart + 1 + inner.length };
+    });
+  }
+
+  function insertFootnote() {
+    withSelection(({ value, selectionStart, selectionEnd }) => {
+      const existingRefs = [...value.matchAll(/\[\^(\d+)\]/g)].map((m) => Number(m[1]));
+      const nextNum = existingRefs.length > 0 ? Math.max(...existingRefs) + 1 : 1;
+      const ref = `[^${nextNum}]`;
+      const definition = `\n[^${nextNum}]: `;
+      const before = value.slice(0, selectionEnd);
+      const after = value.slice(selectionEnd);
+      const nextValue = `${before}${ref}${after}${definition}`;
+      const refEnd = selectionEnd + ref.length;
+      return { value: nextValue, selectionStart: refEnd, selectionEnd: refEnd };
+    });
+  }
+
+  function insertToc() {
+    withSelection(({ value }) => {
+      const headingLines = value.split("\n").filter((line) => /^#{1,6} /.test(line));
+      if (headingLines.length === 0) return null;
+
+      const minLevel = Math.min(...headingLines.map((l) => l.match(/^(#{1,6})/)?.[1].length ?? 1));
+
+      const tocLines = headingLines.map((line) => {
+        const match = line.match(/^(#{1,6}) (.+)$/);
+        if (!match) return null;
+        const level = match[1].length;
+        const title = match[2].trim();
+        const anchor = title.toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
+        const indent = "  ".repeat(level - minLevel);
+        return `${indent}- [${title}](#${anchor})`;
+      }).filter(Boolean);
+
+      const tocBlock = `## Table of Contents\n\n${tocLines.join("\n")}\n\n`;
+      const nextValue = tocBlock + value;
+      return { value: nextValue, selectionStart: 0, selectionEnd: 0 };
+    });
+  }
+
   function buildMarkdownTable(rows: number, cols: number) {
     const clampedRows = Math.max(1, rows);
     const clampedCols = Math.max(1, cols);
@@ -1399,14 +1465,12 @@ function MarkdownEditor({
             <button aria-label="Make it italic" className={`markdown-format-toolbar__button ${isItalicActive ? "is-active" : ""}`} onClick={() => toggleWrapSelection("*", "*", "italic text")} title="Make it italic" type="button"><Italic size={14} /></button>
             <button aria-label="Make it strike through" className={`markdown-format-toolbar__button ${isStrikeActive ? "is-active" : ""}`} onClick={() => toggleWrapSelection("~~", "~~", "strikethrough")} title="Make it strike through" type="button"><span className="markdown-format-toolbar__glyph-strike">A</span></button>
             <span aria-hidden="true" className="markdown-format-toolbar__separator" />
-            <button className="markdown-format-toolbar__button" onClick={() => insertAtCursor("\n---\n")} title="Horizontal rule" type="button">―</button>
-            <span aria-hidden="true" className="markdown-format-toolbar__separator" />
             <button className="markdown-format-toolbar__button" onClick={() => prefixSelectedLines((lineIndex) => `${lineIndex + 1}. `)} title="Numbered list" type="button">1.</button>
+            <button className="markdown-format-toolbar__button" onClick={() => toggleListMarkers()} title="Toggle list" type="button"><List size={14} /></button>
+            <button className="markdown-format-toolbar__button" onClick={() => toggleTaskLists()} title="Task list" type="button"><CheckSquare2 size={14} /></button>
             <button className="markdown-format-toolbar__button" onClick={() => prefixSelectedLines(() => "> ")} title="Blockquote" type="button">❯</button>
             <button className="markdown-format-toolbar__button" onClick={() => prefixSelectedLines(() => "  ")} title="Indent" type="button">⇥</button>
-            <span aria-hidden="true" className="markdown-format-toolbar__separator" />
-            <button className="markdown-format-toolbar__button" onClick={() => toggleTaskLists()} title="Task list" type="button"><CheckSquare2 size={14} /></button>
-            <button className="markdown-format-toolbar__button" onClick={() => toggleListMarkers()} title="Toggle list" type="button"><List size={14} /></button>
+            <button className="markdown-format-toolbar__button" onClick={() => outdentSelectedLines()} title="Outdent" type="button"><IndentDecrease size={14} /></button>
             <span aria-hidden="true" className="markdown-format-toolbar__separator" />
             <div className="markdown-format-toolbar__item" ref={tableMenuRef}>
               <button
@@ -1444,6 +1508,8 @@ function MarkdownEditor({
               </button>
             </div>
             <button className="markdown-format-toolbar__button" onClick={() => wrapSelection("![", "](image.png)", "alt text")} title="Image" type="button">🖼</button>
+            <button className="markdown-format-toolbar__button" onClick={() => insertToc()} title="Insert table of contents" type="button"><TableOfContents size={14} /></button>
+            <button className="markdown-format-toolbar__button" onClick={() => insertFootnote()} title="Footnote" type="button"><Pilcrow size={14} /></button>
             <span aria-hidden="true" className="markdown-format-toolbar__separator" />
             <button className="markdown-format-toolbar__button" onClick={() => wrapSelection("`", "`", "code")} title="Inline code" type="button">&lt;/&gt;</button>
             <div className="markdown-format-toolbar__item" ref={codeLanguagePickerRef}>
@@ -1463,6 +1529,10 @@ function MarkdownEditor({
                 CB
               </button>
             </div>
+            <button className="markdown-format-toolbar__button" onClick={() => insertMath()} title="Inline math" type="button"><Sigma size={14} /></button>
+            <span aria-hidden="true" className="markdown-format-toolbar__separator" />
+            <button className="markdown-format-toolbar__button" onClick={() => insertAtCursor("\n---\n")} title="Horizontal rule" type="button">―</button>
+            <span aria-hidden="true" className="markdown-format-toolbar__separator" />
             <button className="markdown-format-toolbar__button" onClick={() => clearFormatting()} title="Clear formatting" type="button"><Trash2 size={14} /></button>
           </div>
           <textarea

@@ -1889,9 +1889,51 @@ function QuickCaptureDialog({
   );
 }
 
+function ConfirmDialog({
+  message,
+  confirmLabel = "Yes",
+  cancelLabel = "No",
+  onConfirm,
+  onCancel,
+}: {
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      className="dialog-backdrop"
+      role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div
+        aria-modal="true"
+        className="dialog-card"
+        role="alertdialog"
+        aria-label="Confirm action"
+      >
+        <div className="dialog-card__header">
+          <h3>Are you sure?</h3>
+          <button aria-label="Close dialog" className="icon-action" onClick={onCancel} type="button">
+            <X size={16} />
+          </button>
+        </div>
+        <p className="dialog-card__body">{message}</p>
+        <div className="dialog-card__actions">
+          <button autoFocus className="mini-action" onClick={onCancel} type="button">{cancelLabel}</button>
+          <button className="mini-action is-danger" onClick={onConfirm} type="button">{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export {
   BookmarkDialog,
   CommandPalette,
+  ConfirmDialog,
   TagBrowserDialog,
   VersionHistoryDialog,
   BrokenLinksDialog,

@@ -1,8 +1,15 @@
 {
   "name": "organizer",
-  "private": true,
   "version": "0.9.0",
   "type": "module",
+  "files": [
+    "bin/",
+    "dist/",
+    "server/"
+  ],
+  "bin": {
+    "organizer": "./bin/organizer.mjs"
+  },
   "scripts": {
     "dev": "concurrently \"npm:dev:client\" \"npm:dev:server\"",
     "dev:client": "vite --host 127.0.0.1",
@@ -10,7 +17,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "start": "node server/server.mjs",
-    "release:local": "npm run build && NODE_ENV=production node server/server.mjs"
+    "release:local": "npm run build && NODE_ENV=production node server/server.mjs",
+    "prepack": "npm run build"
   },
   "dependencies": {
     "concurrently": "^9.2.1",

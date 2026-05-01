@@ -16,9 +16,76 @@
       href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+    <style>
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        background: #07111f;
+        transition: opacity 0.35s ease;
+      }
+      #splash.splash--hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .splash__logo {
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+      }
+      .splash__name {
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 22px;
+        font-weight: 700;
+        color: #f3f6fb;
+        letter-spacing: 0.01em;
+      }
+      .splash__dots {
+        display: flex;
+        gap: 7px;
+      }
+      .splash__dots span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #78e6c6;
+        opacity: 0.25;
+        animation: splash-pulse 1.2s ease-in-out infinite;
+      }
+      .splash__dots span:nth-child(2) { animation-delay: 0.2s; }
+      .splash__dots span:nth-child(3) { animation-delay: 0.4s; }
+      @keyframes splash-pulse {
+        0%, 100% { opacity: 0.25; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.25); }
+      }
+    </style>
     <script type="module" src="/src/main.tsx"></script>
   </head>
   <body>
+    <div id="splash">
+      <img class="splash__logo" src="/assets/organizer.png" alt="" />
+      <span class="splash__name">Organizer</span>
+      <div class="splash__dots"><span></span><span></span><span></span></div>
+    </div>
     <div id="root"></div>
+    <script>
+      (function () {
+        var root = document.getElementById("root");
+        var splash = document.getElementById("splash");
+        var observer = new MutationObserver(function () {
+          if (root.children.length > 0) {
+            observer.disconnect();
+            splash.classList.add("splash--hidden");
+            setTimeout(function () { splash.remove(); }, 400);
+          }
+        });
+        observer.observe(root, { childList: true });
+      })();
+    </script>
   </body>
   </html>
