@@ -21,7 +21,7 @@ import {
 import { NoteFolderOverviewPanel, NoteListCard, RecentDocumentCard, TrashPanel, DailyNoteNavigator, GraphView, WorkspaceSwitcher } from "./components/NoteComponents";
 import { TodoWorkspace } from "./components/TodoComponents";
 import { MarkdownContent, MarkdownEditor, WikiUnfurlCard } from "./components/MarkdownComponents";
-import { BookmarkTreeNode, BookmarkMenuBar } from "./components/BookmarkComponents";
+import { BookmarkMenuBar, BookmarkDomainTree, BookmarkOverviewPanel, normalizeBookmarkMenuRoots } from "./components/BookmarkComponents";
 import { getClientPlatform, getFolderPathPlaceholder, shouldUseManualFolderPaths } from "./clientPlatform";
 import { getImmersiveChromeState } from "./immersiveLayout";
 import { parseNetscapeBookmarkHtml } from "./netscapeBookmarks";
@@ -130,7 +130,6 @@ import {
   ExternalLink,
   PanelLeftClose,
   PanelLeftOpen,
-  Pencil,
   Minus,
   Plus,
   Search,
@@ -308,12 +307,13 @@ function getStoredSidebarCollapsed() {
   return window.localStorage.getItem(STORED_SIDEBAR_COLLAPSED_KEY) === "true";
 }
 
-function getStoredBookmarkRenderMode(): "tree" | "menu" {
+function getStoredBookmarkRenderMode(): "tree" | "domain" {
   if (typeof window === "undefined") {
-    return "menu";
+    return "tree";
   }
 
-  return window.localStorage.getItem(STORED_BOOKMARK_RENDER_MODE_KEY) === "tree" ? "tree" : "menu";
+  const storedValue = window.localStorage.getItem(STORED_BOOKMARK_RENDER_MODE_KEY);
+  return storedValue === "domain" ? "domain" : "tree";
 }
 
 function getStoredBookmarkCompactMode() {
@@ -325,21 +325,7 @@ function getStoredBookmarkCompactMode() {
 }
 
 function getStoredBookmarkExpandedFolderIds() {
-  if (typeof window === "undefined") {
-    return new Set<string>();
-  }
-
-  try {
-    const raw = window.localStorage.getItem(STORED_BOOKMARK_EXPANDED_FOLDERS_KEY);
-    if (!raw) {
-      return new Set<string>();
-    }
-
-    const parsed = JSON.parse(raw);
-    return new Set(Array.isArray(parsed) ? parsed.filter((folderId): folderId is string => typeof folderId === "string" && folderId.trim().length > 0) : []);
-  } catch {
-    return new Set<string>();
-  }
+  return new Set<string>();
 }
 
 function getStoredNoteSectionPreferences(): NoteSectionPreferences {
@@ -518,7 +504,7 @@ function App() {
   const [draggedNoteSourcePath, setDraggedNoteSourcePath] = useState<string | null>(null);
   const draggedNoteSourcePathRef = useRef<string | null>(null);
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(getStoredBookmarkExpandedFolderIds);
-  const [bookmarkRenderMode, setBookmarkRenderMode] = useState<"tree" | "menu">(getStoredBookmarkRenderMode());
+  const [bookmarkRenderMode, setBookmarkRenderMode] = useState<"tree" | "domain">(getStoredBookmarkRenderMode());
   const [bookmarkCompactMode, setBookmarkCompactMode] = useState(getStoredBookmarkCompactMode());
   const [notesNavigationMode, setNotesNavigationMode] = useState<"folder" | "section">(getStoredNotesNavigationMode());
   const [noteSectionPreferences, setNoteSectionPreferences] = useState<NoteSectionPreferences>(getStoredNoteSectionPreferences());
@@ -1000,10 +986,10 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (section !== "bookmarks" || bookmarkRenderMode !== "menu") {
+    if (section !== "bookmarks") {
       setOpenMenuPath([]);
     }
-  }, [bookmarkRenderMode, section]);
+  }, [section]);
 
   useEffect(() => {
     if (section === "notes" || section === "wiki") {
@@ -1037,6 +1023,14 @@ function App() {
       folders: countFolders(selectedBookmarkNode.children),
     };
   }, [selectedBookmarkNode]);
+
+  const bookmarkOverviewStats = useMemo(() => {
+    const normalizedTree = normalizeBookmarkMenuRoots(filteredBookmarkTree);
+    return {
+      bookmarks: flattenLocalTree(normalizedTree).length,
+      folders: countFolders(normalizedTree),
+    };
+  }, [filteredBookmarkTree]);
 
   const selectedNoteTreeNode = useMemo(
     () => (selectedNoteNodeId ? findNoteTreeNodeById(activeNoteTree, selectedNoteNodeId) : null),
@@ -1196,15 +1190,6 @@ function App() {
 
     return (
       <>
-        <button
-          aria-label="Edit document"
-          className="icon-action markdown-body__edit"
-          onClick={handleStartNoteEditing}
-          title="Edit document"
-          type="button"
-        >
-          <Pencil size={16} />
-        </button>
         {selectedNote?.sourcePath ? (
           <button
             aria-label="Move to trash"
@@ -1216,15 +1201,6 @@ function App() {
             <Trash2 size={16} />
           </button>
         ) : null}
-        <button
-          aria-label="Close document"
-          className="icon-action markdown-body__close"
-          onClick={handleCloseSelectedNote}
-          title="Close document"
-          type="button"
-        >
-          <X size={16} />
-        </button>
       </>
     );
   }
@@ -1244,15 +1220,41 @@ function App() {
         >
           <Maximize2 size={16} />
         </button>
+        <button
+          aria-label="Close document"
+          className="icon-action markdown-body__close"
+          onClick={handleCloseSelectedNote}
+          title="Close document"
+          type="button"
+        >
+          <X size={16} />
+        </button>
       </>
     )
   ) : null;
+  const closeDocumentButton = (
+    <button
+      aria-label="Close document"
+      className="icon-action markdown-body__close"
+      onClick={handleCloseSelectedNote}
+      title="Close document"
+      type="button"
+    >
+      <X size={16} />
+    </button>
+  );
   const standaloneNoteViewerToolbarActions = isMarkdownImmersive ? (
     <>
       {renderNoteViewerZoomControls()}
       {renderNoteViewerDocumentActions()}
+      {closeDocumentButton}
     </>
-  ) : renderNoteViewerDocumentActions();
+  ) : (
+    <>
+      {renderNoteViewerDocumentActions()}
+      {closeDocumentButton}
+    </>
+  );
 
   useEffect(() => {
     window.localStorage.setItem(STORED_RECENT_DOCUMENTS_SORT_MODE_KEY, recentDocumentsSortMode);
@@ -1549,7 +1551,7 @@ function App() {
   const selectedNoteFolderStats = useMemo(() => {
     const folderChildren =
       currentFolderContextNode?.children ??
-      (!currentFolderContextNode && (section === "notes" || section === "wiki" || section === "bookmarks") ? activeNoteTree : null);
+      (!currentFolderContextNode && (section === "notes" || section === "wiki") ? activeNoteTree : null);
 
     if (!folderChildren) {
       return null;
@@ -1566,7 +1568,7 @@ function App() {
     };
   }, [activeNoteTree, allNotes, currentFolderContextNode, section, selectedNoteTreeNode]);
   const showPersistentFolderOverview =
-    (section === "notes" || section === "wiki" || section === "bookmarks") &&
+    (section === "notes" || section === "wiki") &&
     !isMarkdownImmersive &&
     !isNoteEditing &&
     Boolean(selectedNoteFolderStats);
@@ -1576,6 +1578,7 @@ function App() {
   }, [activeNoteSection, activeNoteTree, prefs.showEmptyFoldersAndSections]);
   const showStandaloneNoteViewer = !shouldShowPreviewInPanel;
   const showDetachedStandaloneNoteToolbar = section === "notes" && !isMarkdownImmersive && showStandaloneNoteViewer;
+  const nextBookmarkRenderMode = bookmarkRenderMode === "tree" ? "domain" : "tree";
   const useAsideLayout =
     showPersistentFolderOverview && showStandaloneNoteViewer;
 
@@ -2033,8 +2036,8 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
         return;
       }
 
-      // Cmd/Ctrl+F — search
-      if (isMod && (event.key === "f" || event.key === "F")) {
+      // Cmd/Ctrl+F — search (not when collapsed search card is shown)
+      if (isMod && (event.key === "f" || event.key === "F") && !showCollapsedSearchCard) {
         event.preventDefault();
         openSearchSurface();
         return;
@@ -4499,7 +4502,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
         >
           <div
             className={`card hero-card ${
-              section === "bookmarks" && bookmarkRenderMode === "menu" ? "hero-card--menu" : ""
+              section === "bookmarks" ? "hero-card--menu" : ""
             } ${isMarkdownImmersive ? "is-immersive" : ""}`}
           >
             {((section === "notes" || section === "wiki") && hasLoadedNotes && notes.length === 0) || (section === "bookmarks" && hasLoadedBookmarks && bookmarkTree.length === 0) ? null : (
@@ -4627,20 +4630,13 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
               {section === "bookmarks" ? (
                 <div className="inline-actions">
                   <button
-                    className={`mini-action ${bookmarkRenderMode === "tree" ? "is-active" : ""}`}
-                    onClick={() => setBookmarkRenderMode("tree")}
+                    className="mini-action is-active"
+                    onClick={() => setBookmarkRenderMode(nextBookmarkRenderMode)}
+                    title={`Switch to ${nextBookmarkRenderMode} view`}
                     type="button"
                   >
-                    <ListTree size={14} />
-                    Tree
-                  </button>
-                  <button
-                    className={`mini-action ${bookmarkRenderMode === "menu" ? "is-active" : ""}`}
-                    onClick={() => setBookmarkRenderMode("menu")}
-                    type="button"
-                  >
-                    <LayoutList size={14} />
-                    Menu
+                    {bookmarkRenderMode === "tree" ? <ListTree size={14} /> : <Folder size={14} />}
+                    {bookmarkRenderMode === "tree" ? "Tree" : "Domain"}
                   </button>
                   <button
                     className={`mini-action ${bookmarkCompactMode ? "is-active" : ""}`}
@@ -4806,42 +4802,20 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                     </div>
                   </div>
                   <div
-                    className={`bookmark-tree bookmark-tree--hero ${bookmarkCompactMode ? "is-compact" : ""} ${
-                      bookmarkRenderMode === "menu" ? "is-menu" : ""
-                    }`}
+                    className={`bookmark-tree bookmark-tree--hero is-menu ${bookmarkCompactMode ? "is-compact" : ""}`}
                   >
                     {filteredBookmarkTree.length > 0 ? (
-                      bookmarkRenderMode === "tree" ? (
-                        filteredBookmarkTree.map((node) => (
-                          <BookmarkTreeNode
-                            compact={bookmarkCompactMode}
-                            expandedFolderIds={expandedFolderIds}
-                            key={node.id}
-                            draggedBookmarkId={draggedBookmarkId}
-                            node={node}
-                            onDelete={handleDeleteNode}
-                            onDragEnd={() => setDraggedBookmarkId(null)}
-                            onDragStart={setDraggedBookmarkId}
-                            onDrop={handleDropOnNode}
-                            onEdit={handleEditNode}
-                            onSelect={navigateBookmarkSelection}
-                            selectedBookmarkId={selectedBookmarkId}
-                            onToggleFolder={toggleFolder}
-                          />
-                        ))
-                      ) : (
-                        <BookmarkMenuBar
-                          compact={bookmarkCompactMode}
-                          menuBarRef={menuBarRef}
-                          nodes={filteredBookmarkTree}
-                          onCloseMenus={() => setOpenMenuPath([])}
-                          onOpenMenuPath={setOpenMenuPath}
-                          onSelect={navigateBookmarkSelection}
-                          onToggleStar={handleToggleBookmarkStar}
-                          openMenuPath={openMenuPath}
-                          selectedBookmarkId={selectedBookmarkId}
-                        />
-                      )
+                      <BookmarkMenuBar
+                        compact={bookmarkCompactMode}
+                        menuBarRef={menuBarRef}
+                        nodes={filteredBookmarkTree}
+                        onCloseMenus={() => setOpenMenuPath([])}
+                        onOpenMenuPath={setOpenMenuPath}
+                        onSelect={navigateBookmarkSelection}
+                        onToggleStar={handleToggleBookmarkStar}
+                        openMenuPath={openMenuPath}
+                        selectedBookmarkId={selectedBookmarkId}
+                      />
                     ) : (
                       <article className="bookmark-empty">
                         <h4>No bookmarks visible</h4>
@@ -4859,18 +4833,31 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                   <div className="bookmark-combined-view__section-header">
                     <div>
                       <p className="eyebrow">Bookmarks</p>
-                      <h4>Bookmars navigation</h4>
+                      <h4>Bookmarks navigation</h4>
                       <p className="muted bookmark-combined-view__section-meta">
-                        {selectedNoteFolderStats?.folders ?? 0} folders · {selectedNoteFolderStats?.notes ?? 0} bookmarks
+                        {bookmarkOverviewStats.folders} folders · {bookmarkOverviewStats.bookmarks} bookmarks
                       </p>
                     </div>
                   </div>
-                  {wikiPages.length > 0 && noteFolderOverviewPanel ? (
-                    noteFolderOverviewPanel
+                  {filteredBookmarkTree.length > 0 ? (
+                    bookmarkRenderMode === "tree" ? (
+                      <BookmarkOverviewPanel
+                        onSelect={navigateBookmarkSelection}
+                        selectedBookmarkId={selectedBookmarkId}
+                        tree={filteredBookmarkTree}
+                      />
+                    ) : (
+                      <BookmarkDomainTree
+                        compact={bookmarkCompactMode}
+                        onSelect={navigateBookmarkSelection}
+                        selectedBookmarkId={selectedBookmarkId}
+                        tree={filteredBookmarkTree}
+                      />
+                    )
                   ) : (
                     <article className="bookmark-empty">
-                      <h4>No wiki pages available</h4>
-                      <p>Add or sync wiki-style bookmarks to populate this navigator.</p>
+                      <h4>No bookmarks available</h4>
+                      <p>Import bookmarks or clear the current search to see the bookmark tree.</p>
                     </article>
                   )}
                 </section>
@@ -6177,6 +6164,25 @@ function countFolders(tree: BookmarkNode[]): number {
     }
     return count;
   }, 0);
+}
+
+function getBookmarkFolderTrailIds(tree: BookmarkNode[], targetId: string, trail: string[] = []): string[] {
+  for (const node of tree) {
+    if (node.id === targetId) {
+      return trail;
+    }
+
+    if (node.type !== "folder") {
+      continue;
+    }
+
+    const nextTrail = getBookmarkFolderTrailIds(node.children, targetId, [...trail, node.id]);
+    if (nextTrail.length > 0 || node.children.some((child) => child.id === targetId)) {
+      return nextTrail.length > 0 ? nextTrail : [...trail, node.id];
+    }
+  }
+
+  return [];
 }
 
 function findNodeById(tree: BookmarkNode[], nodeId: string): BookmarkNode | null {

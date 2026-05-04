@@ -3577,6 +3577,10 @@ button.note-breadcrumbs__item:hover {
   flex: 0 0 auto;
 }
 
+.note-folder-overview__toggle-spacer {
+  flex: 0 0 32px;
+}
+
 .note-folder-overview__folder-button {
   display: inline-flex;
   align-items: center;
@@ -4830,8 +4834,15 @@ button.note-breadcrumbs__item:hover {
 }
 
 .bookmark-combined-view__section--bookmarks {
-  flex: none;
+  flex: 0 0 auto;
+  overflow: visible;
   z-index: 20;
+}
+
+.bookmark-tree--hero:not(.is-menu) {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .bookmark-combined-view__section--wiki {
@@ -4912,6 +4923,99 @@ button.note-breadcrumbs__item:hover {
   border-radius: 18px;
   padding: 16px;
   background: var(--panel-soft);
+}
+
+.bookmark-overview {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.bookmark-overview__split {
+  grid-template-columns: minmax(220px, 0.84fr) minmax(0, 1.16fr);
+}
+
+.bookmark-overview__list {
+  gap: 10px;
+}
+
+.bookmark-overview__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(136, 167, 209, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bookmark-overview__item.is-active {
+  border-color: rgba(94, 234, 212, 0.28);
+  background: rgba(45, 212, 191, 0.12);
+}
+
+.bookmark-overview__select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.bookmark-overview__icon {
+  flex: 0 0 auto;
+}
+
+.bookmark-overview__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.bookmark-overview__title,
+.bookmark-overview__meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmark-overview__meta {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.bookmark-domain-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bookmark-domain-tree__group {
+  gap: 8px;
+}
+
+.bookmark-domain-tree__group-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.bookmark-domain-tree__bookmark .bookmark-card__content a:last-child {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .markdown-body--compact {
