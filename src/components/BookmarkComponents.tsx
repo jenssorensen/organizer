@@ -1,6 +1,22 @@
-import { type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { ChevronDown, ChevronRight, ExternalLink, Folder, GripVertical, Pencil, Star, Trash2 } from "lucide-react";
 import type { BookmarkNode } from "../types";
+
+type BookmarkFolderNode = Extract<BookmarkNode, { type: "folder" }>;
+type BookmarkLeafNode = Extract<BookmarkNode, { type: "bookmark" }>;
+
+type BookmarkDomainTreeNode =
+  | {
+      children: BookmarkDomainTreeNode[];
+      id: string;
+      label: string;
+      type: "group";
+    }
+  | {
+      bookmark: BookmarkLeafNode;
+      id: string;
+      type: "bookmark";
+    };
 
 function BookmarkTreeNode({
   node,
@@ -369,6 +385,341 @@ function BookmarkMenuNode({
   );
 }
 
+function BookmarkOverviewPanel({
+  tree,
+  selectedBookmarkId,
+  onSelect,
+  rootLabel = "All bookmarks",
+}: {
+  tree: BookmarkNode[];
+  selectedBookmarkId: string | null;
+  onSelect: (nodeId: string | null) => void;
+  rootLabel?: string;
+}) {
+  const normalizedTree = normalizeBookmarkMenuRoots(tree);
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(() => collectBookmarkFolderIds(normalizedTree));
+  const seenFolderIdsRef = useRef<Set<string>>(new Set());
+  const selectedTrail = selectedBookmarkId ? getBookmarkTreeTrail(normalizedTree, selectedBookmarkId) : [];
+  const activeFolder = getActiveBookmarkFolder(selectedTrail);
+  const activeChildren = activeFolder?.children ?? normalizedTree;
+  const activeChildFolders = activeChildren.filter((node): node is Extract<BookmarkNode, { type: "folder" }> => node.type === "folder");
+  const activeChildBookmarks = activeChildren.filter((node): node is Extract<BookmarkNode, { type: "bookmark" }> => node.type === "bookmark");
+  const activeHeading = activeFolder?.title ?? rootLabel;
+
+  useEffect(() => {
+    setCollapsedFolderIds((current) => {
+      const validFolderIds = collectBookmarkFolderIds(normalizedTree);
+      const next = new Set<string>();
+
+      for (const folderId of current) {
+        if (validFolderIds.has(folderId)) {
+          next.add(folderId);
+        }
+      }
+
+      for (const folderId of validFolderIds) {
+        if (!seenFolderIdsRef.current.has(folderId)) {
+          next.add(folderId);
+        }
+      }
+
+      seenFolderIdsRef.current = validFolderIds;
+      return next;
+    });
+  }, [normalizedTree]);
+
+  function toggleFolder(folderId: string) {
+    setCollapsedFolderIds((current) => {
+      const next = new Set(current);
+      if (next.has(folderId)) {
+        next.delete(folderId);
+      } else {
+        next.add(folderId);
+      }
+      return next;
+    });
+  }
+
+  return (
+    <div className="note-folder-overview bookmark-overview">
+      <div className="note-folder-overview__split bookmark-overview__split">
+        <section className="note-folder-overview__section note-folder-overview__section--tree">
+          <div className="note-folder-overview__section-header">
+            <div className="note-folder-overview__section-heading">
+              <h4>Child folders</h4>
+            </div>
+          </div>
+          <div className="note-folder-overview__tree">
+            <div className="note-folder-overview__tree-item">
+              <button
+                className={`note-folder-overview__folder-button ${activeFolder ? "" : "is-active"}`.trim()}
+                onClick={() => onSelect(null)}
+                type="button"
+              >
+                <Folder size={14} />
+                <span>{rootLabel} ({countBookmarksInNodes(normalizedTree)})</span>
+              </button>
+              {activeChildFolders.length > 0 || normalizedTree.some((node) => node.type === "folder") ? (
+                <div className="note-folder-overview__tree-children">
+                  {normalizedTree
+                    .filter((node): node is Extract<BookmarkNode, { type: "folder" }> => node.type === "folder")
+                    .map((node) => (
+                      <BookmarkOverviewTreeNode
+                        activeFolderId={activeFolder?.id ?? null}
+                        collapsedFolderIds={collapsedFolderIds}
+                        key={node.id}
+                        node={node}
+                        onSelect={onSelect}
+                        onToggleFolder={toggleFolder}
+                      />
+                    ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        <section className="note-folder-overview__section note-folder-overview__section--notes is-list">
+          <div className="note-folder-overview__section-header">
+            <div className="note-folder-overview__section-heading">
+              <h4>{activeHeading}</h4>
+            </div>
+          </div>
+          <div className="note-folder-overview__notes-body is-list bookmark-overview__list">
+            {activeChildBookmarks.length > 0 ? (
+              activeChildBookmarks.map((node) => (
+                <article
+                  className={`bookmark-overview__item ${selectedBookmarkId === node.id ? "is-active" : ""}`.trim()}
+                  key={node.id}
+                >
+                  <button className="bookmark-overview__select" onClick={() => onSelect(node.id)} type="button">
+                    <span className="bookmark-overview__icon">
+                      <BookmarkIcon icon={node.icon} title={node.title} />
+                    </span>
+                    <span className="bookmark-overview__body">
+                      <strong className="bookmark-overview__title">{node.title}</strong>
+                      <span className="bookmark-overview__meta">{node.domain}</span>
+                    </span>
+                  </button>
+                  <a className="icon-action" href={node.url} rel="noreferrer" target="_blank" title="Open bookmark">
+                    <ExternalLink size={14} />
+                  </a>
+                </article>
+              ))
+            ) : (
+              <p className="muted">
+                {activeChildFolders.length > 0 ? "No top-level bookmarks in this folder." : "No bookmarks in this folder."}
+              </p>
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function BookmarkOverviewTreeNode({
+  node,
+  activeFolderId,
+  collapsedFolderIds,
+  onSelect,
+  onToggleFolder,
+}: {
+  node: BookmarkFolderNode;
+  activeFolderId: string | null;
+  collapsedFolderIds: Set<string>;
+  onSelect: (nodeId: string | null) => void;
+  onToggleFolder: (folderId: string) => void;
+}) {
+  const childFolders = node.children.filter((child): child is BookmarkFolderNode => child.type === "folder");
+  const isCollapsed = collapsedFolderIds.has(node.id);
+
+  return (
+    <div className="note-folder-overview__tree-item">
+      <div className="note-folder-overview__tree-row">
+        {childFolders.length > 0 ? (
+          <button
+            aria-label={isCollapsed ? `Expand ${node.title}` : `Collapse ${node.title}`}
+            className="icon-action note-folder-overview__toggle"
+            onClick={() => onToggleFolder(node.id)}
+            title={isCollapsed ? `Expand ${node.title}` : `Collapse ${node.title}`}
+            type="button"
+          >
+            {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+          </button>
+        ) : (
+          <span aria-hidden="true" className="note-folder-overview__toggle-spacer" />
+        )}
+        <button
+          className={`note-folder-overview__folder-button ${activeFolderId === node.id ? "is-active" : ""}`.trim()}
+          onClick={() => onSelect(node.id)}
+          type="button"
+        >
+          <Folder size={14} />
+          <span>{node.title} ({countBookmarksInNodes(node.children)})</span>
+        </button>
+      </div>
+      {childFolders.length > 0 && !isCollapsed ? (
+        <div className="note-folder-overview__tree-children">
+          {childFolders.map((child) => (
+            <BookmarkOverviewTreeNode
+              activeFolderId={activeFolderId}
+              collapsedFolderIds={collapsedFolderIds}
+              key={child.id}
+              node={child}
+              onSelect={onSelect}
+              onToggleFolder={onToggleFolder}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function BookmarkDomainTree({
+  compact,
+  onSelect,
+  selectedBookmarkId,
+  tree,
+}: {
+  compact: boolean;
+  onSelect: (nodeId: string | null) => void;
+  selectedBookmarkId: string | null;
+  tree: BookmarkNode[];
+}) {
+  const domainTree = useMemo(() => buildBookmarkDomainTree(normalizeBookmarkMenuRoots(tree)), [tree]);
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => collectDomainGroupIds(domainTree));
+  const seenGroupIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    setCollapsedGroupIds((current) => {
+      const validGroupIds = collectDomainGroupIds(domainTree);
+      const next = new Set<string>();
+
+      for (const groupId of current) {
+        if (validGroupIds.has(groupId)) {
+          next.add(groupId);
+        }
+      }
+
+      for (const groupId of validGroupIds) {
+        if (!seenGroupIdsRef.current.has(groupId)) {
+          next.add(groupId);
+        }
+      }
+
+      seenGroupIdsRef.current = validGroupIds;
+
+      return next;
+    });
+  }, [domainTree]);
+
+  function toggleGroup(groupId: string) {
+    setCollapsedGroupIds((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  }
+
+  return (
+    <div className={`bookmark-tree bookmark-tree--hero bookmark-domain-tree ${compact ? "is-compact" : ""}`}>
+      {domainTree.map((node) => (
+        <BookmarkDomainTreeNodeRow
+          collapsedGroupIds={collapsedGroupIds}
+          key={node.id}
+          node={node}
+          onSelect={onSelect}
+          onToggleGroup={toggleGroup}
+          selectedBookmarkId={selectedBookmarkId}
+        />
+      ))}
+    </div>
+  );
+}
+
+function BookmarkDomainTreeNodeRow({
+  collapsedGroupIds,
+  node,
+  onSelect,
+  onToggleGroup,
+  selectedBookmarkId,
+}: {
+  collapsedGroupIds: Set<string>;
+  node: BookmarkDomainTreeNode;
+  onSelect: (nodeId: string | null) => void;
+  onToggleGroup: (groupId: string) => void;
+  selectedBookmarkId: string | null;
+}) {
+  if (node.type === "bookmark") {
+    return (
+      <article
+        className={`bookmark-card bookmark-card--tree bookmark-domain-tree__bookmark ${selectedBookmarkId === node.bookmark.id ? "is-selected" : ""}`}
+        onClick={() => onSelect(node.bookmark.id)}
+      >
+        <div className="bookmark-card__top">
+          <span className="tree-folder__label">
+            <BookmarkIcon icon={node.bookmark.icon} title={node.bookmark.title} />
+          </span>
+          <div className="bookmark-card__content">
+            <h4>
+              <a
+                href={node.bookmark.url}
+                onClick={(event) => event.stopPropagation()}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {node.bookmark.title}
+              </a>
+            </h4>
+            <a
+              href={node.bookmark.url}
+              onClick={(event) => event.stopPropagation()}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {node.bookmark.url}
+            </a>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  const isCollapsed = collapsedGroupIds.has(node.id);
+
+  return (
+    <div className="tree-folder bookmark-domain-tree__group">
+      <div className="tree-folder__title">
+        <button className="tree-folder__label bookmark-domain-tree__group-label" onClick={() => onToggleGroup(node.id)} type="button">
+          {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+          <Folder size={16} />
+          <span>{node.label}</span>
+        </button>
+      </div>
+      {!isCollapsed ? (
+        <div className="tree-folder__children">
+          {node.children.map((child) => (
+            <BookmarkDomainTreeNodeRow
+              collapsedGroupIds={collapsedGroupIds}
+              key={child.id}
+              node={child}
+              onSelect={onSelect}
+              onToggleGroup={onToggleGroup}
+              selectedBookmarkId={selectedBookmarkId}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function BookmarkIcon({ icon, title }: { icon: string; title: string }) {
   if (icon.startsWith("data:image")) {
     return <img className="bookmark-favicon bookmark-favicon--image" src={icon} alt={title} />;
@@ -379,7 +730,15 @@ function BookmarkIcon({ icon, title }: { icon: string; title: string }) {
 
 function isFavoritesRoot(title: string) {
   const normalized = title.trim().toLowerCase();
-  return normalized === "favorites" || normalized === "favorites bar" || normalized === "bookmarks bar";
+  return (
+    normalized === "favorites" ||
+    normalized === "favorites bar" ||
+    normalized === "bookmarks bar" ||
+    normalized === "bookmarks" ||
+    normalized === "bookmarks menu" ||
+    normalized === "other bookmarks" ||
+    normalized === "mobile bookmarks"
+  );
 }
 
 function normalizeBookmarkMenuRoots(nodes: BookmarkNode[]) {
@@ -417,4 +776,156 @@ function isPathPrefix(path: string[], openPath: string[]) {
   return path.every((segment, index) => openPath[index] === segment);
 }
 
-export { BookmarkTreeNode, BookmarkMenuBar, BookmarkMenuNode, BookmarkIcon };
+function getBookmarkTreeTrail(nodes: BookmarkNode[], targetId: string): BookmarkNode[] {
+  for (const node of nodes) {
+    if (node.id === targetId) {
+      return [node];
+    }
+
+    if (node.type !== "folder") {
+      continue;
+    }
+
+    const childTrail = getBookmarkTreeTrail(node.children, targetId);
+    if (childTrail.length > 0) {
+      return [node, ...childTrail];
+    }
+  }
+
+  return [];
+}
+
+function getActiveBookmarkFolder(trail: BookmarkNode[]) {
+  if (trail.length === 0) {
+    return null;
+  }
+
+  const lastNode = trail[trail.length - 1];
+  if (lastNode?.type === "folder") {
+    return lastNode;
+  }
+
+  for (let index = trail.length - 1; index >= 0; index -= 1) {
+    const node = trail[index];
+    if (node?.type === "folder") {
+      return node;
+    }
+  }
+
+  return null;
+}
+
+function countBookmarksInNodes(nodes: BookmarkNode[]): number {
+  return nodes.reduce((count, node) => {
+    if (node.type === "bookmark") {
+      return count + 1;
+    }
+
+    return count + countBookmarksInNodes(node.children);
+  }, 0);
+}
+
+function collectBookmarkFolderIds(nodes: BookmarkNode[], acc: Set<string> = new Set<string>()) {
+  for (const node of nodes) {
+    if (node.type !== "folder") {
+      continue;
+    }
+
+    acc.add(node.id);
+    collectBookmarkFolderIds(node.children, acc);
+  }
+
+  return acc;
+}
+
+function buildBookmarkDomainTree(nodes: BookmarkNode[]): BookmarkDomainTreeNode[] {
+  const rootMap = new Map<string, BookmarkDomainTreeNode>();
+
+  for (const bookmark of flattenBookmarkLeaves(nodes)) {
+    const { baseDomain, subdomains } = splitDomainParts(bookmark.domain);
+    const rootId = `domain:${baseDomain}`;
+    let currentNode = rootMap.get(rootId);
+
+    if (!currentNode || currentNode.type !== "group") {
+      currentNode = { children: [], id: rootId, label: baseDomain, type: "group" };
+      rootMap.set(rootId, currentNode);
+    }
+
+    let currentGroup = currentNode;
+    let pathKey = baseDomain;
+    for (const subdomain of subdomains) {
+      pathKey = `${pathKey}.${subdomain}`;
+      const nextGroupId = `domain:${pathKey}`;
+      let nextGroup = currentGroup.children.find((child) => child.type === "group" && child.id === nextGroupId);
+      if (!nextGroup || nextGroup.type !== "group") {
+        nextGroup = { children: [], id: nextGroupId, label: subdomain, type: "group" };
+        currentGroup.children.push(nextGroup);
+      }
+      currentGroup = nextGroup;
+    }
+
+    currentGroup.children.push({ bookmark, id: `domain-bookmark:${bookmark.id}`, type: "bookmark" });
+  }
+
+  return sortBookmarkDomainNodes([...rootMap.values()]);
+}
+
+function sortBookmarkDomainNodes(nodes: BookmarkDomainTreeNode[]): BookmarkDomainTreeNode[] {
+  return [...nodes]
+    .sort((left, right) => {
+      if (left.type === right.type) {
+        const leftLabel = left.type === "group" ? left.label : left.bookmark.title;
+        const rightLabel = right.type === "group" ? right.label : right.bookmark.title;
+        return leftLabel.localeCompare(rightLabel);
+      }
+
+      return left.type === "group" ? -1 : 1;
+    })
+    .map((node) => {
+      if (node.type === "group") {
+        return { ...node, children: sortBookmarkDomainNodes(node.children) };
+      }
+
+      return node;
+    });
+}
+
+function collectDomainGroupIds(nodes: BookmarkDomainTreeNode[], acc: Set<string> = new Set<string>()) {
+  for (const node of nodes) {
+    if (node.type !== "group") {
+      continue;
+    }
+
+    acc.add(node.id);
+    collectDomainGroupIds(node.children, acc);
+  }
+
+  return acc;
+}
+
+function flattenBookmarkLeaves(nodes: BookmarkNode[]): BookmarkLeafNode[] {
+  return nodes.flatMap((node) => {
+    if (node.type === "bookmark") {
+      return [node];
+    }
+
+    return flattenBookmarkLeaves(node.children);
+  });
+}
+
+function splitDomainParts(domain: string) {
+  const normalizedDomain = domain.trim().toLowerCase();
+  const labels = normalizedDomain.split(".").filter(Boolean);
+  const normalizedLabels = labels[0] === "www" ? labels.slice(1) : labels;
+
+  if (normalizedLabels.length <= 2) {
+    return { baseDomain: normalizedLabels.join("."), subdomains: [] as string[] };
+  }
+
+  return {
+    baseDomain: normalizedLabels.slice(-2).join("."),
+    subdomains: normalizedLabels.slice(0, -2).reverse(),
+  };
+}
+
+export { BookmarkTreeNode, BookmarkMenuBar, BookmarkMenuNode, BookmarkIcon, BookmarkDomainTree, BookmarkOverviewPanel, normalizeBookmarkMenuRoots };
