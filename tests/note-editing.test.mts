@@ -286,8 +286,11 @@ test("folder overview notes section keeps the current list layout and sort contr
 
 test("folder overview summary cards reuse the tree note row shell", async () => {
   const noteComponentsSource = await readFile(new URL("../src/components/NoteComponents.tsx", import.meta.url), "utf8");
+  const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
 
   assert.match(noteComponentsSource, /function NoteSummaryCard\(/);
+  assert.match(noteComponentsSource, /onStartEditingNote\?: \(note: Note, nodeId: string\) => void;/);
+  assert.match(noteComponentsSource, /onDoubleClick=\{\(\) => \{[\s\S]*onStartEditing\?\.[\s\S]*\}\}/);
   assert.match(noteComponentsSource, /noteViewCount\?: number;/);
   assert.match(noteComponentsSource, /viewMode\?: NoteRowViewMode;/);
   assert.match(noteComponentsSource, /const sourceFileName = getNoteSourceFileName\(note\);/);
@@ -299,6 +302,20 @@ test("folder overview summary cards reuse the tree note row shell", async () => 
   assert.match(noteComponentsSource, /noteViewCount=\{noteViewCounts\.get\(`\$\{noteItem\.kind\}:\$\{noteItem\.id\}`\) \?\? 0\}/);
   assert.match(noteComponentsSource, /\{!isCompactView \? <span aria-hidden="true" className="note-leaf__separator" \/> : null\}/);
   assert.match(noteComponentsSource, /viewMode=\{noteRowViewMode\}/);
+  assert.match(appSource, /function handleStartEditingNote\(note: Note, nodeId: string \| null\)/);
+  assert.match(appSource, /onStartEditingNote=\{section === "notes" \? handleStartEditingNote : undefined\}/);
+});
+
+test("app preserves the current folder context when a selected note disappears", async () => {
+  const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const notesDataSource = await readFile(new URL("../src/useNotesData.ts", import.meta.url), "utf8");
+
+  assert.match(appSource, /const lastValidNoteContextNodeIdRef = useRef\(ROOT_NOTE_NODE_ID\);/);
+  assert.match(appSource, /getFallbackSelectedNoteNodeId: \(\) => lastValidNoteContextNodeIdRef\.current/);
+  assert.match(appSource, /lastValidNoteContextNodeIdRef\.current = folderTrail\.at\(-1\)\?\.id \?\? ROOT_NOTE_NODE_ID;/);
+  assert.match(notesDataSource, /getFallbackSelectedNoteNodeId\?: \(\) => string \| null;/);
+  assert.match(notesDataSource, /const fallbackSelectedNoteNodeId = getFallbackSelectedNoteNodeId\?\.\(\) \?\? null;/);
+  assert.match(notesDataSource, /resolveSelectedNoteNodeId\(\{[\s\S]*fallbackSelectedNoteNodeId,[\s\S]*tree: data\.tree,[\s\S]*\}\)/);
 });
 
 test("folder overview exposes a shared detailed and compact row view menu", async () => {

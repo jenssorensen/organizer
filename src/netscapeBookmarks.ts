@@ -9,6 +9,7 @@ export function parseNetscapeBookmarkHtml(html: string): BookmarkNode[] {
   const root: StackFolder = { title: "__root__", children: [] };
   const stack: StackFolder[] = [root];
   let pendingFolderTitle: string | null = null;
+  const bookmarkOccurrences = new Map<string, number>();
 
   for (const rawLine of html.split(/\r?\n/)) {
     const line = rawLine.trim();
@@ -61,8 +62,11 @@ export function parseNetscapeBookmarkHtml(html: string): BookmarkNode[] {
 
     const rawTitle = decodeHtml(bookmarkMatch[2] ?? "").trim();
     const title = rawTitle || safeDomain(url);
+    const bookmarkPathId = getBookmarkPathId(stack, title, url);
+    const bookmarkOccurrence = (bookmarkOccurrences.get(bookmarkPathId) ?? 0) + 1;
+    bookmarkOccurrences.set(bookmarkPathId, bookmarkOccurrence);
     stack[stack.length - 1]?.children.push({
-      id: createNodeId(`bookmark:${url}`),
+      id: createNodeId(`bookmark:${bookmarkPathId}:${bookmarkOccurrence}`),
       type: "bookmark",
       title,
       description: "",
@@ -98,6 +102,10 @@ function decodeHtml(value: string) {
 
 function getFolderPathId(stack: StackFolder[], title: string) {
   return [...stack.slice(1).map((folder) => folder.title), title].join("/");
+}
+
+function getBookmarkPathId(stack: StackFolder[], title: string, url: string) {
+  return [...stack.slice(1).map((folder) => folder.title), `${title}:${url}`].join("/");
 }
 
 function createNodeId(value: string) {

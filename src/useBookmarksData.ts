@@ -24,12 +24,22 @@ export function useBookmarksData({
       }
 
       const data = (await response.json()) as BookmarksResponse;
-      setBookmarkTree(data.tree);
-      setBookmarks(data.bookmarks);
+      const normalizedTree = normalizeBookmarkTreeIds(data.tree);
+      const normalizedBookmarks = flattenBookmarkTree(normalizedTree);
+      setBookmarkTree(normalizedTree);
+      setBookmarks(normalizedBookmarks);
       onSelectedBookmarkIdChange((current) =>
-        current && findNodeById(data.tree, current) ? current : data.bookmarks[0]?.id ?? firstTreeNode(data.tree)?.id ?? null,
+        current && findNodeById(normalizedTree, current) ? current : normalizedBookmarks[0]?.id ?? firstTreeNode(normalizedTree)?.id ?? null,
       );
-      setBookmarkStatus(`${data.bookmarks.length} bookmarks synced`);
+      setBookmarkStatus(`${normalizedBookmarks.length} bookmarks synced`);
+
+      if (!areBookmarkTreesEqual(data.tree, normalizedTree)) {
+        void fetch(`${apiBase}/api/bookmarks`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tree: normalizedTree }),
+        }).catch(() => {});
+      }
     } catch {
       setBookmarkStatus("Bookmark API offline");
     } finally {
@@ -119,4 +129,80 @@ function findNodeById(tree: BookmarkNode[], nodeId: string): BookmarkNode | null
   }
 
   return null;
+}
+
+function normalizeBookmarkTreeIds(tree: BookmarkNode[]): BookmarkNode[] {
+  const seenIds = new Set<string>();
+  const pathCounts = new Map<string, number>();
+
+  function visit(nodes: BookmarkNode[], path: string[]): BookmarkNode[] {
+    return nodes.map((node) => {
+      const pathKey = createBookmarkPathKey(node, path);
+      const nextCount = (pathCounts.get(pathKey) ?? 0) + 1;
+      pathCounts.set(pathKey, nextCount);
+
+      const nextId = !node.id || seenIds.has(node.id)
+        ? createNormalizedBookmarkNodeId(pathKey, nextCount)
+        : node.id;
+      seenIds.add(nextId);
+
+      if (node.type === "folder") {
+        return {
+          ...node,
+          id: nextId,
+          children: visit(node.children, [...path, node.title]),
+        };
+      }
+
+      return {
+        ...node,
+        id: nextId,
+      };
+    });
+  }
+
+  return visit(tree, []);
+}
+
+function createBookmarkPathKey(node: BookmarkNode, path: string[]) {
+  if (node.type === "folder") {
+    return ["folder", ...path, node.title].join("/");
+  }
+
+  return ["bookmark", ...path, node.title, node.url].join("/");
+}
+
+function createNormalizedBookmarkNodeId(value: string, occurrence: number) {
+  const base = occurrence > 1 ? `${value}:${occurrence}` : value;
+  let hash = 0;
+
+  for (const character of base) {
+    hash = (hash * 31 + character.codePointAt(0)!) >>> 0;
+  }
+
+  return `node-${hash.toString(36)}`;
+}
+
+function flattenBookmarkTree(tree: BookmarkNode[], path: string[] = []): BookmarkItem[] {
+  return tree.flatMap((node) => {
+    if (node.type === "folder") {
+      return flattenBookmarkTree(node.children, [...path, node.title]);
+    }
+
+    return [{
+      id: node.id,
+      title: node.title,
+      description: node.description ?? "",
+      url: node.url,
+      domain: node.domain,
+      icon: node.icon,
+      tags: node.tags,
+      path,
+      starred: node.starred,
+    }];
+  });
+}
+
+function areBookmarkTreesEqual(left: BookmarkNode[], right: BookmarkNode[]): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }

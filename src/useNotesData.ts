@@ -8,6 +8,7 @@ export function useNotesData({
   apiBase,
   rootNodeId,
   currentSelectedNoteNodeId,
+  getFallbackSelectedNoteNodeId,
   onSelectedNoteNodeIdChange,
   onSyncQueueChange,
   supportedNoteFileTypes,
@@ -15,6 +16,7 @@ export function useNotesData({
   apiBase: string;
   rootNodeId: string;
   currentSelectedNoteNodeId: string | null;
+  getFallbackSelectedNoteNodeId?: () => string | null;
   onSelectedNoteNodeIdChange: (nodeId: string | null | ((current: string | null) => string | null)) => void;
   onSyncQueueChange?: (count: number) => void;
   supportedNoteFileTypes: string[];
@@ -44,9 +46,11 @@ export function useNotesData({
       setDocsFolder(data.docsFolder);
       setIsMultiRoot(Array.isArray(data.additionalFolders) && data.additionalFolders.length > 0);
       setNotesStatus(`${data.notes.length} note files indexed`);
+      const fallbackSelectedNoteNodeId = getFallbackSelectedNoteNodeId?.() ?? null;
       onSelectedNoteNodeIdChange((current) =>
         resolveSelectedNoteNodeId({
           currentSelectedNoteNodeId: current ?? currentSelectedNoteNodeIdRef.current,
+          fallbackSelectedNoteNodeId,
           rootNodeId,
           tree: data.tree,
         }),
@@ -58,7 +62,7 @@ export function useNotesData({
     } finally {
       setHasLoadedNotes(true);
     }
-  }, [apiBase, onSelectedNoteNodeIdChange, rootNodeId, supportedNoteFileTypes]);
+  }, [apiBase, getFallbackSelectedNoteNodeId, onSelectedNoteNodeIdChange, rootNodeId, supportedNoteFileTypes]);
 
   const createNoteDocument = useCallback(
     async (targetPath: string, fileName: string) => {

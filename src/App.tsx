@@ -603,6 +603,7 @@ function App() {
   const [docsSourceSubmitting, setDocsSourceSubmitting] = useState(false);
   const [trashEntries, setTrashEntries] = useState<TrashEntry[]>([]);
   const [showTrashPanel, setShowTrashPanel] = useState(false);
+  const lastValidNoteContextNodeIdRef = useRef(ROOT_NOTE_NODE_ID);
   const [showGraphView, setShowGraphView] = useState(false);
   const [showDailyNotes, setShowDailyNotes] = useState(false);
   const [dailyNoteDate, setDailyNoteDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -615,6 +616,7 @@ function App() {
   const [reminderNotifications, setReminderNotifications] = useState<TodoItem[]>([]);
   const isSyncingRef = useRef(false);
   const lastRestorePointFingerprintRef = useRef("");
+  const getFallbackSelectedNoteNodeId = useCallback(() => lastValidNoteContextNodeIdRef.current, []);
   const refreshPendingSyncCount = useCallback(() => setPendingSyncCount(loadSyncQueue().length), []);
   const loadSidebarOrder = useCallback(async () => {
     try {
@@ -691,6 +693,7 @@ function App() {
     apiBase: sidebarApiBase,
     rootNodeId: ROOT_NOTE_NODE_ID,
     currentSelectedNoteNodeId: selectedNoteNodeId,
+    getFallbackSelectedNoteNodeId,
     onSelectedNoteNodeIdChange: setSelectedNoteNodeId,
     onSyncQueueChange: setPendingSyncCount,
     supportedNoteFileTypes: prefs.supportedNoteFileTypes,
@@ -962,8 +965,40 @@ function App() {
       return;
     }
 
+    if (!selectedNoteNodeId || selectedNoteNodeId === ROOT_NOTE_NODE_ID) {
+      lastValidNoteContextNodeIdRef.current = ROOT_NOTE_NODE_ID;
+      return;
+    }
+
+    const selectedNode = findNoteTreeNodeById(nextTree, selectedNoteNodeId);
+    if (!selectedNode) {
+      return;
+    }
+
+    if (selectedNode.type === "folder") {
+      lastValidNoteContextNodeIdRef.current = selectedNode.id;
+      return;
+    }
+
+    const folderTrail = getNoteTreeTrail(nextTree, selectedNoteNodeId).filter(
+      (node): node is NoteFolderNode => node.type === "folder",
+    );
+    lastValidNoteContextNodeIdRef.current = folderTrail.at(-1)?.id ?? ROOT_NOTE_NODE_ID;
+  }, [resolvedNotesTree, section, selectedNoteNodeId, wikiTree]);
+
+  useEffect(() => {
+    if (section !== "notes" && section !== "wiki" && section !== "bookmarks") {
+      return;
+    }
+
+    const nextTree = section === "notes" ? resolvedNotesTree : wikiTree;
+    if (nextTree.length === 0) {
+      return;
+    }
+
     const nextSelectedNoteNodeId = resolveSelectedNoteNodeId({
       currentSelectedNoteNodeId: selectedNoteNodeId,
+      fallbackSelectedNoteNodeId: lastValidNoteContextNodeIdRef.current,
       rootNodeId: ROOT_NOTE_NODE_ID,
       tree: nextTree,
     });
@@ -2383,6 +2418,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       onSelectSection={(nodeId) => navigateNoteSelection(nodeId, "notes")}
       onSetSectionColor={section === "notes" ? handleSetNoteSectionColor : undefined}
       onSelectFolder={navigateNoteSelection}
+      onStartEditingNote={section === "notes" ? handleStartEditingNote : undefined}
       onRenameNote={section === "notes" ? handleRenameNoteFile : undefined}
       onOpenNoteHistory={(note) => {
         setVersionHistoryNote(note);
@@ -2631,8 +2667,20 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       return;
     }
 
-    setPendingEditorScrollRatio(getScrollProgress(viewerContentRef.current));
-    setNoteDraft(selectedNote.content);
+    handleStartEditingNote(selectedNote, selectedNoteNodeId);
+  }
+
+  function handleStartEditingNote(note: Note, nodeId: string | null) {
+    if (!canEditNote(note)) {
+      return;
+    }
+
+    if (nodeId && selectedNoteNodeId !== nodeId) {
+      navigateNoteSelection(nodeId, "notes");
+    }
+
+    setPendingEditorScrollRatio(selectedNote?.id === note.id ? getScrollProgress(viewerContentRef.current) : 0);
+    setNoteDraft(note.content);
     setNoteSaveError(null);
     setNoteSaveState("idle");
     setIsNoteEditing(true);
@@ -4669,13 +4717,13 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
               {section === "bookmarks" ? (
                 <div className="inline-actions">
                   <button
-                    className="mini-action is-active"
+                    className="mini-action notes-actions__button notes-actions__button--view is-active"
                     onClick={() => setBookmarkRenderMode(nextBookmarkRenderMode)}
                     title={`Switch to ${nextBookmarkRenderMode} view`}
                     type="button"
                   >
-                    {bookmarkRenderMode === "tree" ? <ListTree size={14} /> : <Folder size={14} />}
-                    {bookmarkRenderMode === "tree" ? "Tree" : "Domain"}
+                    {bookmarkRenderMode === "tree" ? <FolderTree size={14} /> : <LayoutList size={14} />}
+                    <span className="notes-actions__label">{bookmarkRenderMode === "tree" ? "Tree" : "Domain"}</span>
                   </button>
                   <button
                     className={`mini-action ${bookmarkCompactMode ? "is-active" : ""}`}
