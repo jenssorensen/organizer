@@ -13,10 +13,12 @@ type NoteLeafNodeLike = {
 
 export function resolveSelectedNoteNodeId({
   currentSelectedNoteNodeId,
+  fallbackSelectedNoteNodeId,
   rootNodeId,
   tree,
 }: {
   currentSelectedNoteNodeId: string | null;
+  fallbackSelectedNoteNodeId?: string | null;
   rootNodeId: string;
   tree: NoteTreeNodeLike[];
 }): string {
@@ -24,7 +26,19 @@ export function resolveSelectedNoteNodeId({
     return rootNodeId;
   }
 
-  return findNoteTreeNodeById(tree, currentSelectedNoteNodeId) ? currentSelectedNoteNodeId : rootNodeId;
+  if (findNoteTreeNodeById(tree, currentSelectedNoteNodeId)) {
+    return currentSelectedNoteNodeId;
+  }
+
+  if (
+    fallbackSelectedNoteNodeId &&
+    fallbackSelectedNoteNodeId !== rootNodeId &&
+    findNoteTreeNodeById(tree, fallbackSelectedNoteNodeId)
+  ) {
+    return fallbackSelectedNoteNodeId;
+  }
+
+  return rootNodeId;
 }
 
 function findNoteTreeNodeById(tree: NoteTreeNodeLike[], targetId: string): NoteTreeNodeLike | null {

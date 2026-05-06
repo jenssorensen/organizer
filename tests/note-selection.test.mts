@@ -73,3 +73,21 @@ test("falls back to the root overview when the previous selection no longer exis
 
   assert.equal(nextSelection, ROOT_NOTE_NODE_ID);
 });
+
+test("falls back to the current folder context when the selected note disappears", () => {
+  const nextSelection = resolveSelectedNoteNodeId({
+    currentSelectedNoteNodeId: "missing-note",
+    fallbackSelectedNoteNodeId: "folder-a",
+    rootNodeId: ROOT_NOTE_NODE_ID,
+    tree: [
+      {
+        id: "folder-a",
+        type: "folder",
+        title: "Folder A",
+        children: [],
+      },
+    ],
+  });
+
+  assert.equal(nextSelection, "folder-a");
+});

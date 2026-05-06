@@ -4962,7 +4962,7 @@ button.note-breadcrumbs__item:hover {
 }
 
 .bookmark-overview__split {
-  grid-template-columns: minmax(220px, 0.84fr) minmax(0, 1.16fr);
+  gap: 16px;
 }
 
 .bookmark-overview__list {
@@ -4970,54 +4970,56 @@ button.note-breadcrumbs__item:hover {
 }
 
 .bookmark-overview__item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid rgba(136, 167, 209, 0.14);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.bookmark-overview__item.is-active {
-  border-color: rgba(94, 234, 212, 0.28);
-  background: rgba(45, 212, 191, 0.12);
+  position: relative;
 }
 
 .bookmark-overview__select {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
   gap: 10px;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
+  padding-right: 46px;
+  transition: transform 160ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.bookmark-overview__item:hover > .bookmark-overview__select,
+.bookmark-overview__item:focus-within > .bookmark-overview__select {
+  border-color: rgba(120, 230, 198, 0.34);
+  background: rgba(24, 48, 68, 0.92);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+}
+
+.bookmark-overview__item > .bookmark-overview__select:active {
+  transform: translateY(0);
+  border-color: rgba(120, 230, 198, 0.42);
+  background: rgba(19, 40, 58, 0.96);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .bookmark-overview__icon {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: start;
+  margin-top: 1px;
 }
 
 .bookmark-overview__body {
   display: flex;
   flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  justify-content: flex-start;
   min-width: 0;
 }
 
-.bookmark-overview__title,
-.bookmark-overview__meta {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.bookmark-overview__meta {
-  color: var(--muted);
-  font-size: 0.84rem;
+.bookmark-overview__action {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
 }
 
 .bookmark-domain-tree {

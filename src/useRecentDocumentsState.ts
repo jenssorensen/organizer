@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RecentDocumentEntry, RecentDocumentSeed } from "./types";
 import {
+  getRecentDocumentViewKey,
   hydrateRecentDocumentsState,
   pruneRecentDocuments,
   recordRecentDocumentView,
@@ -30,11 +31,20 @@ export function useRecentDocumentsState({
 }) {
   const [recentDocuments, setRecentDocuments] = useState<RecentDocumentEntry[]>([]);
   const [hasLoadedRecentDocuments, setHasLoadedRecentDocuments] = useState(false);
+  const lastRecordedDocumentKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!currentRenderedDocument) {
+      lastRecordedDocumentKeyRef.current = null;
       return;
     }
+
+    const nextDocumentKey = getRecentDocumentViewKey(currentRenderedDocument);
+    if (lastRecordedDocumentKeyRef.current === nextDocumentKey) {
+      return;
+    }
+
+    lastRecordedDocumentKeyRef.current = nextDocumentKey;
 
     setRecentDocuments((current) => recordRecentDocumentView(current, currentRenderedDocument, Date.now()));
   }, [currentRenderedDocument]);
