@@ -10,12 +10,14 @@ export function useNotesData({
   currentSelectedNoteNodeId,
   onSelectedNoteNodeIdChange,
   onSyncQueueChange,
+  supportedNoteFileTypes,
 }: {
   apiBase: string;
   rootNodeId: string;
   currentSelectedNoteNodeId: string | null;
   onSelectedNoteNodeIdChange: (nodeId: string | null | ((current: string | null) => string | null)) => void;
   onSyncQueueChange?: (count: number) => void;
+  supportedNoteFileTypes: string[];
 }) {
   const [notesTree, setNotesTree] = useState<NoteTreeNode[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -28,8 +30,10 @@ export function useNotesData({
   currentSelectedNoteNodeIdRef.current = currentSelectedNoteNodeId;
 
   const loadNotes = useCallback(async () => {
+    const supportedExtensionsQuery = encodeURIComponent(supportedNoteFileTypes.join(","));
+
     try {
-      const response = await fetch(`${apiBase}/api/notes`);
+      const response = await fetch(`${apiBase}/api/notes?supportedExtensions=${supportedExtensionsQuery}`);
       if (!response.ok) {
         throw new Error("Failed to load notes");
       }
@@ -39,7 +43,7 @@ export function useNotesData({
       setNotes(data.notes);
       setDocsFolder(data.docsFolder);
       setIsMultiRoot(Array.isArray(data.additionalFolders) && data.additionalFolders.length > 0);
-      setNotesStatus(`${data.notes.length} markdown files indexed`);
+      setNotesStatus(`${data.notes.length} note files indexed`);
       onSelectedNoteNodeIdChange((current) =>
         resolveSelectedNoteNodeId({
           currentSelectedNoteNodeId: current ?? currentSelectedNoteNodeIdRef.current,
@@ -54,7 +58,7 @@ export function useNotesData({
     } finally {
       setHasLoadedNotes(true);
     }
-  }, [apiBase, onSelectedNoteNodeIdChange, rootNodeId]);
+  }, [apiBase, onSelectedNoteNodeIdChange, rootNodeId, supportedNoteFileTypes]);
 
   const createNoteDocument = useCallback(
     async (targetPath: string, fileName: string) => {

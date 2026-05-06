@@ -41,3 +41,41 @@ test("readDocsTree skips notes that disappear during a scan", async () => {
     },
   ]);
 });
+
+test("readDocsTree honors configured supported note file types", async () => {
+  const docsDir = await mkdtemp(path.join(os.tmpdir(), "organizer-docs-tree-extensions-"));
+  await writeFile(path.join(docsDir, "keep.md"), "# Keep\n\nStill here.");
+  await writeFile(path.join(docsDir, "saved.html"), "<h1>Saved</h1><p>HTML note</p>");
+  await writeFile(path.join(docsDir, "page.mhtml"), "MHTML capture");
+  await writeFile(path.join(docsDir, "plain.txt"), "Plain text note");
+  await writeFile(path.join(docsDir, "skip.json"), "{}");
+
+  const notes = [];
+  const tree = await readDocsTree(docsDir, "", notes, {
+    supportedFileExtensions: [".md", ".html", ".mhtml", ".txt"],
+  });
+
+  assert.deepEqual(notes.map((note) => note.sourcePath), ["keep.md", "page.mhtml", "plain.txt", "saved.html"]);
+  assert.deepEqual(tree, [
+    {
+      id: createDocNoteId("keep.md"),
+      type: "note",
+      noteId: createDocNoteId("keep.md"),
+    },
+    {
+      id: createDocNoteId("page.mhtml"),
+      type: "note",
+      noteId: createDocNoteId("page.mhtml"),
+    },
+    {
+      id: createDocNoteId("plain.txt"),
+      type: "note",
+      noteId: createDocNoteId("plain.txt"),
+    },
+    {
+      id: createDocNoteId("saved.html"),
+      type: "note",
+      noteId: createDocNoteId("saved.html"),
+    },
+  ]);
+});

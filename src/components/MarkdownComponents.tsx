@@ -28,7 +28,7 @@ import ruby from "react-syntax-highlighter/dist/esm/languages/prism/ruby";
 import swift from "react-syntax-highlighter/dist/esm/languages/prism/swift";
 import yaml from "react-syntax-highlighter/dist/esm/languages/prism/yaml";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Bold, Check, CheckSquare2, Copy, Eye, EyeOff, IndentDecrease, Italic, Link2, List, Minus, Pencil, Pilcrow, Plus, Sigma, TableOfContents, Trash2, SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
+import { Bold, Check, CheckSquare2, Copy, Eye, EyeOff, IndentDecrease, Italic, Link2, List, Minus, Pilcrow, Plus, Save, Sigma, TableOfContents, Trash2, SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
 import { getMarkdownLinkAttributes } from "../markdownLinks";
 import {
   clampEditorSplitPercent,
@@ -63,6 +63,294 @@ function PdfEmbed({ src, title }: { src: string; title?: string }) {
         <a href={src} rel="noreferrer noopener" target="_blank">{title || "Open PDF"}</a>
       </div>
       <iframe className="markdown-pdf-embed__frame" src={src} title={title || "PDF preview"} />
+    </div>
+  );
+}
+
+function getNotePreviewKind(noteSourcePath?: string) {
+  const extension = getNotePreviewExtension(noteSourcePath);
+
+  if (extension === ".html" || extension === ".mhtml" || extension === ".txt") {
+    return "document";
+  }
+
+  return "markdown";
+}
+
+function getNotePreviewExtension(noteSourcePath?: string) {
+  const fileName = noteSourcePath?.split("/").pop() ?? "";
+  const extensionMatch = fileName.match(/\.[^.]+$/);
+  return extensionMatch ? extensionMatch[0].toLowerCase() : ".md";
+}
+
+function buildSandboxFrameMarkup(bodyClassName: string) {
+  return `<!doctype html><html><head><meta charset="utf-8" /><base target="_blank" /></head><body class="${bodyClassName}"><div id="organizer-sandbox-root"></div></body></html>`;
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function decodeQuotedPrintable(value: string) {
+  return value
+    .replace(/=\r?\n/g, "")
+    .replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
+}
+
+function decodeBase64ToUtf8(value: string) {
+  if (typeof atob !== "function") {
+    return value;
+  }
+
+  const binary = atob(value.replace(/\s+/g, ""));
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+
+  if (typeof TextDecoder === "function") {
+    return new TextDecoder("utf-8").decode(bytes);
+  }
+
+  return binary;
+}
+
+function decodeMhtmlPartBody(headers: string, body: string) {
+  const transferEncoding = headers.match(/content-transfer-encoding:\s*([^\r\n;]+)/i)?.[1]?.trim().toLowerCase();
+  const trimmedBody = body.trim();
+
+  if (transferEncoding === "quoted-printable") {
+    return decodeQuotedPrintable(trimmedBody);
+  }
+
+  if (transferEncoding === "base64") {
+    return decodeBase64ToUtf8(trimmedBody);
+  }
+
+  return trimmedBody;
+}
+
+function extractHtmlFromMhtml(mhtml: string) {
+  const boundary = mhtml.match(/boundary="?([^";\r\n]+)"?/i)?.[1];
+  if (!boundary) {
+    return "";
+  }
+
+  const parts = mhtml.split(`--${boundary}`);
+  for (const part of parts) {
+    if (!/content-type:\s*text\/html/i.test(part)) {
+      continue;
+    }
+
+    const splitIndex = part.search(/\r?\n\r?\n/);
+    if (splitIndex === -1) {
+      continue;
+    }
+
+    const headers = part.slice(0, splitIndex);
+    const body = part.slice(splitIndex).replace(/^\r?\n\r?\n/, "");
+    return decodeMhtmlPartBody(headers, body);
+  }
+
+  return "";
+}
+
+function buildPlainTextPreviewSrcDoc(content: string) {
+  return `<!doctype html><html><head><meta charset="utf-8" /><base target="_blank" /><style>body{margin:0;padding:24px;font:14px/1.6 Consolas, "Courier New", monospace;background:#0f1720;color:#e6edf3;}pre{white-space:pre-wrap;word-break:break-word;margin:0;}</style></head><body><pre>${escapeHtml(content)}</pre></body></html>`;
+}
+
+function sanitizePreviewHtmlDocument(html: string, noteSourcePath?: string) {
+  if (typeof DOMParser !== "function") {
+    return buildPlainTextPreviewSrcDoc(html);
+  }
+
+  const previewDocument = new DOMParser().parseFromString(html, "text/html");
+
+  previewDocument.querySelectorAll("script, noscript, object, embed").forEach((node) => node.remove());
+
+  for (const element of Array.from(previewDocument.querySelectorAll("*"))) {
+    for (const attribute of Array.from(element.attributes)) {
+      if (/^on/i.test(attribute.name)) {
+        element.removeAttribute(attribute.name);
+      }
+    }
+  }
+
+  const head = previewDocument.head ?? previewDocument.createElement("head");
+  if (!previewDocument.head) {
+    previewDocument.documentElement.prepend(head);
+  }
+
+  head.querySelectorAll("base").forEach((node) => node.remove());
+  const baseElement = previewDocument.createElement("base");
+  baseElement.target = "_blank";
+  head.prepend(baseElement);
+
+  for (const element of Array.from(previewDocument.querySelectorAll("[src], [href]"))) {
+    if (element.hasAttribute("src")) {
+      element.setAttribute("src", resolveNoteAssetUrl(element.getAttribute("src") ?? "", noteSourcePath));
+    }
+
+    const tagName = element.tagName.toLowerCase();
+    if (element.hasAttribute("href") && (tagName === "a" || tagName === "link")) {
+      element.setAttribute("href", resolveNoteAssetUrl(element.getAttribute("href") ?? "", noteSourcePath));
+    }
+  }
+
+  return `<!doctype html>${previewDocument.documentElement.outerHTML}`;
+}
+
+function buildDocumentPreviewSrcDoc(content: string, noteSourcePath?: string) {
+  const extension = getNotePreviewExtension(noteSourcePath);
+
+  if (extension === ".txt") {
+    return buildPlainTextPreviewSrcDoc(content);
+  }
+
+  if (extension === ".mhtml") {
+    const html = extractHtmlFromMhtml(content);
+    return sanitizePreviewHtmlDocument(html || content, noteSourcePath);
+  }
+
+  return sanitizePreviewHtmlDocument(content, noteSourcePath);
+}
+
+function cloneStylesIntoFrame(frameDocument: Document) {
+  if (frameDocument.head.querySelector("[data-organizer-frame-styles='true']")) {
+    return;
+  }
+
+  const marker = frameDocument.createElement("meta");
+  marker.setAttribute("data-organizer-frame-styles", "true");
+  frameDocument.head.appendChild(marker);
+
+  for (const node of Array.from(document.head.querySelectorAll("style, link[rel='stylesheet']"))) {
+    if (node instanceof HTMLStyleElement) {
+      const style = frameDocument.createElement("style");
+      style.textContent = node.textContent;
+      frameDocument.head.appendChild(style);
+      continue;
+    }
+
+    if (node instanceof HTMLLinkElement && node.href) {
+      const link = frameDocument.createElement("link");
+      link.rel = "stylesheet";
+      link.href = node.href;
+      frameDocument.head.appendChild(link);
+    }
+  }
+}
+
+function SandboxedPreviewFrame({
+  className,
+  contentRef,
+  frameTitle,
+  frameSrc,
+  frameSrcDoc,
+  allowScripts = false,
+  portalContent,
+}: {
+  className: string;
+  contentRef?: RefObject<HTMLDivElement | null>;
+  frameTitle: string;
+  frameSrc?: string;
+  frameSrcDoc?: string;
+  allowScripts?: boolean;
+  portalContent?: ReactNode;
+}) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe || frameSrc) {
+      setPortalRoot(null);
+      return;
+    }
+
+    const frameDocument = iframe.contentDocument;
+    if (!frameDocument) {
+      return;
+    }
+
+    frameDocument.open();
+    frameDocument.write(frameSrcDoc ?? buildSandboxFrameMarkup("markdown-body markdown-body--frame"));
+    frameDocument.close();
+    cloneStylesIntoFrame(frameDocument);
+    setPortalRoot(frameDocument.getElementById("organizer-sandbox-root"));
+  }, [frameSrc, frameSrcDoc]);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) {
+      return;
+    }
+
+    let resizeObserver: ResizeObserver | null = null;
+
+    const syncFrameHeight = () => {
+      const frameDocument = iframe.contentDocument;
+      if (!frameDocument) {
+        return;
+      }
+
+      const root = frameDocument.getElementById("organizer-sandbox-root") ?? frameDocument.body;
+      const nextHeight = Math.max(
+        root.scrollHeight,
+        frameDocument.body.scrollHeight,
+        frameDocument.documentElement.scrollHeight,
+        1,
+      );
+      iframe.style.height = `${nextHeight}px`;
+    };
+
+    const handleLoad = () => {
+      const frameDocument = iframe.contentDocument;
+      if (!frameDocument) {
+        return;
+      }
+
+      if (frameSrc) {
+        cloneStylesIntoFrame(frameDocument);
+      }
+
+      syncFrameHeight();
+
+      if (typeof ResizeObserver !== "undefined") {
+        const resizeTarget = frameDocument.getElementById("organizer-sandbox-root") ?? frameDocument.body;
+        resizeObserver = new ResizeObserver(() => syncFrameHeight());
+        resizeObserver.observe(resizeTarget);
+      }
+    };
+
+    iframe.addEventListener("load", handleLoad);
+    window.requestAnimationFrame(syncFrameHeight);
+
+    return () => {
+      iframe.removeEventListener("load", handleLoad);
+      resizeObserver?.disconnect();
+    };
+  }, [frameSrc, portalRoot, portalContent]);
+
+  return (
+    <div className={className} ref={contentRef}>
+      <iframe
+        className="markdown-body__sandbox-frame"
+        ref={iframeRef}
+        sandbox={[
+          "allow-downloads",
+          "allow-popups",
+          "allow-popups-to-escape-sandbox",
+          "allow-same-origin",
+          allowScripts ? "allow-scripts" : "",
+        ].filter(Boolean).join(" ")}
+        src={frameSrc}
+        srcDoc={frameSrc ? undefined : frameSrcDoc}
+        title={frameTitle}
+      />
+      {portalRoot && portalContent ? createPortal(portalContent, portalRoot) : null}
     </div>
   );
 }
@@ -298,6 +586,107 @@ function MarkdownFencedCodeBlock({
   );
 }
 
+function RenderedMarkdownDocument({
+  markdown,
+  noteSourcePath,
+  contentScale,
+  hasToolbar,
+  theme,
+  frameMode = false,
+}: {
+  markdown: string;
+  noteSourcePath?: string;
+  contentScale: number;
+  hasToolbar: boolean;
+  theme: "dark" | "light";
+  frameMode?: boolean;
+}) {
+  return (
+    <div
+      className={frameMode ? "markdown-body__frame-root" : "markdown-body__content"}
+      style={{ fontSize: `${contentScale}%`, paddingTop: hasToolbar ? undefined : 0 }}
+    >
+      <div className={frameMode ? "markdown-body__content markdown-body__content--frame-inner" : undefined}>
+        <ReactMarkdown
+          rehypePlugins={markdownRehypePlugins}
+          remarkPlugins={markdownRemarkPlugins}
+          components={{
+            a(props) {
+              const { href, children } = props;
+              const resolvedHref = resolveNoteAssetUrl(href ?? "", noteSourcePath);
+              if (resolvedHref && /\.pdf$/i.test(resolvedHref.split("?")[0])) {
+                return <PdfEmbed src={resolvedHref} title={typeof children === "string" ? children : undefined} />;
+              }
+              const linkProps = getMarkdownLinkAttributes(resolvedHref || href);
+              return (
+                <a {...linkProps}>
+                  {children}
+                </a>
+              );
+            },
+            p(props) {
+              const { children } = props;
+              const childArray = Array.isArray(children) ? children : [children];
+              const nonEmpty = childArray.filter((c) => c !== "\n" && c !== "");
+              if (
+                nonEmpty.length === 1 &&
+                nonEmpty[0] &&
+                typeof nonEmpty[0] === "object" &&
+                "type" in nonEmpty[0] &&
+                nonEmpty[0].type === "a" &&
+                nonEmpty[0].props?.href
+              ) {
+                const linkHref = nonEmpty[0].props.href as string;
+                const linkChildren = nonEmpty[0].props.children;
+                const isAutoLink = typeof linkChildren === "string" && linkChildren === linkHref;
+                if (isAutoLink && /^https?:\/\//i.test(linkHref)) {
+                  return <LinkPreviewCard href={linkHref}>{linkChildren}</LinkPreviewCard>;
+                }
+              }
+              return <p>{children}</p>;
+            },
+            img(props) {
+              const { src, alt, width, height, ...rest } = props;
+              const resolvedSrc = resolveNoteAssetUrl(src ?? "", noteSourcePath);
+              return <img {...rest} alt={alt} height={height} loading="lazy" src={resolvedSrc} width={width} />;
+            },
+            code(props) {
+              const { children, className } = props;
+              const match = /language-([\w+-]+)/.exec(className || "");
+              const code = String(children).replace(/\n$/, "");
+              const language = match?.[1]?.toLowerCase() ?? "";
+
+              if (language === "mermaid") {
+                return <MermaidDiagram chart={code} theme={theme} />;
+              }
+
+              return match ? (
+                <MarkdownFencedCodeBlock code={code} language={language} theme={theme} />
+              ) : (
+                <code className={className}>{children}</code>
+              );
+            },
+            h2(props) {
+              return <h2 {...props} />;
+            },
+            h3(props) {
+              return <h3 {...props} />;
+            },
+            h4(props) {
+              return <h4 {...props} />;
+            },
+            blockquote(props) {
+              return <blockquote {...props} />;
+            },
+          }}
+        >
+          {markdown}
+        </ReactMarkdown>
+      </div>
+    </div>
+  );
+}
+
 function MarkdownContent({
   markdown,
   noteSourcePath,
@@ -307,6 +696,8 @@ function MarkdownContent({
   omitRootWrapper = false,
   toolbarLeading,
   toolbarActions,
+  allowIframeScripts = false,
+  useSandboxFrame = false,
 }: {
   markdown: string;
   noteSourcePath?: string;
@@ -316,90 +707,48 @@ function MarkdownContent({
   omitRootWrapper?: boolean;
   toolbarLeading?: ReactNode;
   toolbarActions?: ReactNode;
+  allowIframeScripts?: boolean;
+  useSandboxFrame?: boolean;
 }) {
   const theme = useResolvedTheme();
   const hasToolbar = Boolean(toolbarLeading || toolbarActions);
-  const contentNode = (
-    <div
-      className="markdown-body__content"
-      ref={contentRef}
-      style={{ fontSize: `${contentScale}%`, paddingTop: hasToolbar ? undefined : 0 }}
-    >
-      <ReactMarkdown
-        rehypePlugins={markdownRehypePlugins}
-        remarkPlugins={markdownRemarkPlugins}
-        components={{
-          a(props) {
-            const { href, children } = props;
-            const resolvedHref = resolveNoteAssetUrl(href ?? "", noteSourcePath);
-            if (resolvedHref && /\.pdf$/i.test(resolvedHref.split("?")[0])) {
-              return <PdfEmbed src={resolvedHref} title={typeof children === "string" ? children : undefined} />;
-            }
-            const linkProps = getMarkdownLinkAttributes(resolvedHref || href);
-            return (
-              <a {...linkProps}>
-                {children}
-              </a>
-            );
-          },
-          p(props) {
-            const { children } = props;
-            const childArray = Array.isArray(children) ? children : [children];
-            const nonEmpty = childArray.filter((c) => c !== "\n" && c !== "");
-            if (
-              nonEmpty.length === 1 &&
-              nonEmpty[0] &&
-              typeof nonEmpty[0] === "object" &&
-              "type" in nonEmpty[0] &&
-              nonEmpty[0].type === "a" &&
-              nonEmpty[0].props?.href
-            ) {
-              const linkHref = nonEmpty[0].props.href as string;
-              const linkChildren = nonEmpty[0].props.children;
-              const isAutoLink = typeof linkChildren === "string" && linkChildren === linkHref;
-              if (isAutoLink && /^https?:\/\//i.test(linkHref)) {
-                return <LinkPreviewCard href={linkHref}>{linkChildren}</LinkPreviewCard>;
-              }
-            }
-            return <p>{children}</p>;
-          },
-          img(props) {
-            const { src, alt, width, height, ...rest } = props;
-            const resolvedSrc = resolveNoteAssetUrl(src ?? "", noteSourcePath);
-            return <img {...rest} alt={alt} height={height} loading="lazy" src={resolvedSrc} width={width} />;
-          },
-          code(props) {
-            const { children, className } = props;
-            const match = /language-([\w+-]+)/.exec(className || "");
-            const code = String(children).replace(/\n$/, "");
-            const language = match?.[1]?.toLowerCase() ?? "";
-
-            if (language === "mermaid") {
-              return <MermaidDiagram chart={code} theme={theme} />;
-            }
-
-            return match ? (
-              <MarkdownFencedCodeBlock code={code} language={language} theme={theme} />
-            ) : (
-              <code className={className}>{children}</code>
-            );
-          },
-          h2(props) {
-            return <h2 {...props} />;
-          },
-          h3(props) {
-            return <h3 {...props} />;
-          },
-          h4(props) {
-            return <h4 {...props} />;
-          },
-          blockquote(props) {
-            return <blockquote {...props} />;
-          },
-        }}
-      >
-        {markdown}
-      </ReactMarkdown>
+  const contentNode = useSandboxFrame ? (
+    getNotePreviewKind(noteSourcePath) === "document" && noteSourcePath ? (
+      <SandboxedPreviewFrame
+        allowScripts={allowIframeScripts}
+        className="markdown-body__content markdown-body__content--sandbox"
+        contentRef={contentRef}
+        frameSrcDoc={buildDocumentPreviewSrcDoc(markdown, noteSourcePath)}
+        frameTitle={noteSourcePath}
+      />
+    ) : (
+      <SandboxedPreviewFrame
+        allowScripts={allowIframeScripts}
+        className="markdown-body__content markdown-body__content--sandbox"
+        contentRef={contentRef}
+        frameSrcDoc={buildSandboxFrameMarkup("markdown-body markdown-body--frame")}
+        frameTitle={noteSourcePath ?? "Markdown preview"}
+        portalContent={(
+          <RenderedMarkdownDocument
+            contentScale={contentScale}
+            frameMode
+            hasToolbar={hasToolbar}
+            markdown={markdown}
+            noteSourcePath={noteSourcePath}
+            theme={theme}
+          />
+        )}
+      />
+    )
+  ) : (
+    <div className="markdown-body__content" ref={contentRef}>
+      <RenderedMarkdownDocument
+        contentScale={contentScale}
+        hasToolbar={hasToolbar}
+        markdown={markdown}
+        noteSourcePath={noteSourcePath}
+        theme={theme}
+      />
     </div>
   );
 
@@ -431,11 +780,13 @@ function MarkdownContent({
 }
 
 function MarkdownEditor({
+  allowIframeScripts = false,
   documentPath,
   noteSourcePath,
+  canSave,
   markdown,
   onChange,
-  onCancel,
+  onClose,
   onZoomIn,
   onZoomOut,
   onSave,
@@ -450,11 +801,13 @@ function MarkdownEditor({
   saveState,
   saveError,
 }: {
+  allowIframeScripts?: boolean;
   documentPath: string;
   noteSourcePath?: string;
+  canSave: boolean;
   markdown: string;
   onChange: (value: string) => void;
-  onCancel: () => void;
+  onClose: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onSave: () => void;
@@ -526,7 +879,7 @@ function MarkdownEditor({
     value: string;
     selectionStart: number;
     selectionEnd: number;
-  }) {
+  } | null) {
     const editor = editorInputRef.current;
     if (!editor) {
       return;
@@ -536,6 +889,10 @@ function MarkdownEditor({
     const selectionEnd = editor.selectionEnd;
     const selectedText = markdown.slice(selectionStart, selectionEnd);
     const next = transform({ value: markdown, selectionStart, selectionEnd, selectedText });
+    if (!next) {
+      return;
+    }
+
     commitEditorValue(next.value, next.selectionStart, next.selectionEnd);
   }
 
@@ -829,7 +1186,7 @@ function MarkdownEditor({
   }
 
   function insertFootnote() {
-    withSelection(({ value, selectionStart, selectionEnd }) => {
+    withSelection(({ value, selectionEnd }) => {
       const existingRefs = [...value.matchAll(/\[\^(\d+)\]/g)].map((m) => Number(m[1]));
       const nextNum = existingRefs.length > 0 ? Math.max(...existingRefs) + 1 : 1;
       const ref = `[^${nextNum}]`;
@@ -1367,73 +1724,77 @@ function MarkdownEditor({
   return (
     <div className="markdown-editor" ref={editorRootRef}>
       <div className="markdown-body__toolbar markdown-editor__toolbar">
-        <button
-          aria-pressed={showPreview}
-          className="mini-action"
-          disabled={saveState === "saving"}
-          onClick={() => setShowPreview((current) => !current)}
-          title={showPreview ? "Hide preview" : "Show preview"}
-          type="button"
-        >
-          {showPreview ? <EyeOff size={16} /> : <Eye size={16} />}
-          {showPreview ? "Hide preview" : "Show preview"}
-        </button>
-        <button
-          aria-label={previewLayout === "side-by-side" ? "Below preview" : "Side by side"}
-          className="mini-action"
-          disabled={saveState === "saving"}
-          onClick={() =>
-            setPreviewLayout((current) => (current === "side-by-side" ? "below" : "side-by-side"))
-          }
-          title={previewLayout === "side-by-side" ? "Switch to below preview" : "Switch to side-by-side preview"}
-          type="button"
-        >
-          {previewLayout === "side-by-side" ? <SplitSquareVertical size={16} /> : <SplitSquareHorizontal size={16} />}
-          {previewLayout === "side-by-side" ? "Below preview" : "Side by side"}
-        </button>
-        <div className={`markdown-body__toolbar-side ${showPreview ? "" : "is-disabled"}`.trim()}>
+        <div className="markdown-body__toolbar-side">
           <button
-            aria-label="Zoom out"
-            className="icon-action markdown-body__zoom"
-            disabled={saveState === "saving" || !showPreview}
-            onClick={onZoomOut}
-            title="Zoom out"
+            aria-pressed={showPreview}
+            className="mini-action"
+            disabled={saveState === "saving"}
+            onClick={() => setShowPreview((current) => !current)}
+            title={showPreview ? "Hide preview" : "Show preview"}
             type="button"
           >
-            <Minus size={16} />
+            {showPreview ? <EyeOff size={16} /> : <Eye size={16} />}
+            {showPreview ? "Hide preview" : "Show preview"}
           </button>
-          <span className="markdown-body__zoom-value">{previewContentScale}%</span>
           <button
-            aria-label="Zoom in"
-            className="icon-action markdown-body__zoom"
+            aria-label={previewLayout === "side-by-side" ? "Below preview" : "Side by side"}
+            className="mini-action"
             disabled={saveState === "saving" || !showPreview}
-            onClick={onZoomIn}
-            title="Zoom in"
+            onClick={() =>
+              setPreviewLayout((current) => (current === "side-by-side" ? "below" : "side-by-side"))
+            }
+            title={previewLayout === "side-by-side" ? "Switch to below preview" : "Switch to side-by-side preview"}
             type="button"
           >
-            <Plus size={16} />
+            {previewLayout === "side-by-side" ? <SplitSquareVertical size={16} /> : <SplitSquareHorizontal size={16} />}
+            {previewLayout === "side-by-side" ? "Below preview" : "Side by side"}
           </button>
         </div>
-        <button
-          className="mini-action"
-          disabled={saveState === "saving"}
-          onClick={onCancel}
-          title="Cancel editing"
-          type="button"
-        >
-          <X size={16} />
-          Cancel
-        </button>
-        <button
-          className="mini-action markdown-editor__save"
-          disabled={saveState === "saving"}
-          onClick={onSave}
-          title={saveState === "saving" ? "Saving note" : "Save note"}
-          type="button"
-        >
-          <Pencil size={16} />
-          {saveState === "saving" ? "Saving..." : "Save"}
-        </button>
+        <div className="markdown-body__toolbar-side markdown-editor__toolbar-actions">
+          <div className={`markdown-body__toolbar-side ${showPreview ? "" : "is-disabled"}`.trim()}>
+            <button
+              aria-label="Zoom out"
+              className="icon-action markdown-body__zoom"
+              disabled={saveState === "saving" || !showPreview}
+              onClick={onZoomOut}
+              title="Zoom out"
+              type="button"
+            >
+              <Minus size={16} />
+            </button>
+            <span className="markdown-body__zoom-value">{previewContentScale}%</span>
+            <button
+              aria-label="Zoom in"
+              className="icon-action markdown-body__zoom"
+              disabled={saveState === "saving" || !showPreview}
+              onClick={onZoomIn}
+              title="Zoom in"
+              type="button"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+          <button
+            aria-label="Save note"
+            className="icon-action markdown-editor__save"
+            disabled={saveState === "saving" || !canSave}
+            onClick={onSave}
+            title={saveState === "saving" ? "Saving note" : canSave ? "Save note" : "No changes to save"}
+            type="button"
+          >
+            <Save size={16} />
+          </button>
+          <button
+            aria-label="Close document"
+            className="icon-action markdown-body__close"
+            disabled={saveState === "saving"}
+            onClick={onClose}
+            title="Close document"
+            type="button"
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
       <div
         className={`markdown-editor__split ${showPreview && previewLayout === "side-by-side" ? "markdown-editor__split--side-by-side" : ""}`}
@@ -1581,7 +1942,7 @@ function MarkdownEditor({
                 <span className="status-pill subtle">Markdown preview</span>
               </div>
               <div className="markdown-editor__preview-body" ref={previewBodyRef}>
-                <MarkdownContent contentScale={previewContentScale} markdown={markdown} noteSourcePath={noteSourcePath} />
+                <MarkdownContent allowIframeScripts={allowIframeScripts} contentScale={previewContentScale} markdown={markdown} noteSourcePath={noteSourcePath} useSandboxFrame />
               </div>
             </section>
           </>

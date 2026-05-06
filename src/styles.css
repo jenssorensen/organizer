@@ -1323,6 +1323,33 @@ a {
   padding-top: 52px;
 }
 
+.markdown-body__content--sandbox {
+  padding-top: 0;
+  background: var(--panel);
+}
+
+.markdown-body__content--frame-inner {
+  padding: 1.5rem;
+}
+
+.markdown-body__frame-root {
+  min-height: 100%;
+}
+
+.markdown-body__sandbox-frame {
+  display: block;
+  width: 100%;
+  min-height: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.markdown-body--frame {
+  margin: 0;
+  min-height: 100%;
+  background: var(--panel);
+}
+
 .markdown-body__content > :last-child {
   margin-bottom: 0;
 }
@@ -2277,6 +2304,10 @@ button.note-breadcrumbs__item:hover {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.markdown-editor__toolbar-actions {
+  margin-left: auto;
 }
 
 .markdown-editor__save {
@@ -6942,6 +6973,43 @@ button.note-breadcrumbs__item:hover {
   background: rgba(120, 230, 198, 0.15);
   color: var(--accent);
   font-weight: 600;
+}
+
+.prefs-choice-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.prefs-choice-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.14s, background 0.14s, color 0.14s;
+}
+
+.prefs-choice-pill:hover {
+  border-color: rgba(120, 230, 198, 0.24);
+  color: var(--text);
+}
+
+.prefs-choice-pill.is-active {
+  border-color: rgba(120, 230, 198, 0.32);
+  background: rgba(120, 230, 198, 0.12);
+  color: var(--accent);
+}
+
+.prefs-choice-pill input {
+  margin: 0;
 }
 
 .prefs-section__desc {

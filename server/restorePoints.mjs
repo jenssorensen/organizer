@@ -46,10 +46,23 @@ function sanitizePrefs(value) {
       ? "panel"
       : "own-view";
 
+  const supportedNoteFileTypes = value && typeof value === "object" && Array.isArray(value.supportedNoteFileTypes)
+    ? Array.from(new Set(
+      value.supportedNoteFileTypes
+        .filter((entry) => typeof entry === "string")
+        .map((entry) => entry.trim().toLowerCase())
+        .filter(Boolean),
+    ))
+    : [".md"];
+
   return {
     feedsMode,
     showBacklinks: Boolean(value && typeof value === "object" && value.showBacklinks),
     showEmptyFoldersAndSections: Boolean(value && typeof value === "object" && value.showEmptyFoldersAndSections),
+    showCollapsedSearchCard: !(value && typeof value === "object") || value.showCollapsedSearchCard !== false,
+    searchInterface: value && typeof value === "object" && value.searchInterface === "palette" ? "palette" : "topbar",
+    supportedNoteFileTypes: supportedNoteFileTypes.length > 0 ? supportedNoteFileTypes : [".md"],
+    allowIframeScripts: Boolean(value && typeof value === "object" && value.allowIframeScripts),
   };
 }
 

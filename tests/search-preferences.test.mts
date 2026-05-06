@@ -11,11 +11,15 @@ test("search preferences wire topbar and overlay search modes through app state"
 
   assert.match(appTypesSource, /showCollapsedSearchCard: boolean;/);
   assert.match(appTypesSource, /searchInterface: "topbar" \| "palette";/);
+  assert.match(appTypesSource, /supportedNoteFileTypes: SupportedNoteFileType\[\];/);
+  assert.match(appTypesSource, /allowIframeScripts: boolean;/);
   assert.match(appSource, /showCollapsedSearchCard: parsed\.showCollapsedSearchCard !== false,/);
   assert.match(appSource, /searchInterface: parsed\.searchInterface === "palette" \? "palette" : "topbar",/);
-  assert.match(appSource, /return \{[\s\S]*showCollapsedSearchCard: true,[\s\S]*searchInterface: "topbar",[\s\S]*\};/);
+  assert.match(appSource, /supportedNoteFileTypes: sanitizeSupportedNoteFileTypes\(parsed\.supportedNoteFileTypes\),/);
+  assert.match(appSource, /allowIframeScripts: parsed\.allowIframeScripts === true,/);
+  assert.match(appSource, /return \{[\s\S]*showCollapsedSearchCard: true,[\s\S]*searchInterface: "topbar",[\s\S]*supportedNoteFileTypes: \[\.\.\.DEFAULT_SUPPORTED_NOTE_FILE_TYPES\],[\s\S]*allowIframeScripts: false,[\s\S]*\};/);
   assert.match(appSource, /const \[isSearchDialogOpen, setIsSearchDialogOpen\] = useState\(false\);/);
-  assert.match(appSource, /if \(isMod && \(event\.key === "f" \|\| event\.key === "F"\)\) \{/);
+  assert.match(appSource, /if \(isMod && \(event\.key === "f" \|\| event\.key === "F"\) && !showCollapsedSearchCard\) \{/);
   assert.match(appSource, /function openSearchSurface\(\) \{/);
   assert.match(appSource, /if \(prefs\.searchInterface === "palette"\) \{/);
   assert.match(appSource, /const searchShortcutTitle = platform === "mac"[\s\S]*"Search \(⌘F\)"[\s\S]*"Search \(Ctrl\+F\)";/);

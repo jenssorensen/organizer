@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { NoteVersion, AppPrefs } from "./appTypes";
+import {
+  DEFAULT_SUPPORTED_NOTE_FILE_TYPES,
+  SUPPORTED_NOTE_FILE_TYPES,
+  type NoteVersion,
+  type AppPrefs,
+  type SupportedNoteFileType,
+} from "./appTypes";
 import { snapshotNoteVersion } from "./noteVersionHistory";
 import { getNoteSourceFileName, formatNoteTargetLocation, formatNoteTimestamp, countNotesInTree } from "./noteFormatting";
 import {
   BookmarkDialog,
   CommandPalette,
   ConfirmDialog,
+  UnsavedChangesDialog,
   TagBrowserDialog,
   VersionHistoryDialog,
   BrokenLinksDialog,
@@ -26,7 +33,7 @@ import { getClientPlatform, getFolderPathPlaceholder, shouldUseManualFolderPaths
 import { getImmersiveChromeState } from "./immersiveLayout";
 import { parseNetscapeBookmarkHtml } from "./netscapeBookmarks";
 import { type NavigationSnapshot } from "./navigationHistory";
-import { canEditNote } from "./noteEditing";
+import { canEditNote, canTrashNote } from "./noteEditing";
 import { filterEmptyFolderNodes, filterEmptyNoteSections } from "./noteVisibility";
 import {
   applyNoteSectionPreferences,
@@ -414,6 +421,27 @@ function buildBrokenLinks(allNotes: Note[]): Map<string, string[]> {
   return result;
 }
 function getStoredPrefs(): AppPrefs {
+  function sanitizeSupportedNoteFileTypes(value: unknown): SupportedNoteFileType[] {
+    if (!Array.isArray(value)) {
+      return [...DEFAULT_SUPPORTED_NOTE_FILE_TYPES];
+    }
+
+    const normalized = Array.from(new Set(
+      value.flatMap((entry) => {
+        if (typeof entry !== "string") {
+          return [];
+        }
+
+        const candidate = entry.trim().toLowerCase();
+        return SUPPORTED_NOTE_FILE_TYPES.includes(candidate as SupportedNoteFileType)
+          ? [candidate as SupportedNoteFileType]
+          : [];
+      }),
+    ));
+
+    return normalized.length > 0 ? normalized : [...DEFAULT_SUPPORTED_NOTE_FILE_TYPES];
+  }
+
   try {
     const raw = window.localStorage.getItem(STORED_PREFS_KEY);
     if (raw) {
@@ -425,6 +453,8 @@ function getStoredPrefs(): AppPrefs {
         showEmptyFoldersAndSections: parsed.showEmptyFoldersAndSections === true,
         showCollapsedSearchCard: parsed.showCollapsedSearchCard !== false,
         searchInterface: parsed.searchInterface === "palette" ? "palette" : "topbar",
+        supportedNoteFileTypes: sanitizeSupportedNoteFileTypes(parsed.supportedNoteFileTypes),
+        allowIframeScripts: parsed.allowIframeScripts === true,
       };
     }
   } catch { /* ignore */ }
@@ -434,6 +464,8 @@ function getStoredPrefs(): AppPrefs {
     showEmptyFoldersAndSections: false,
     showCollapsedSearchCard: true,
     searchInterface: "topbar",
+    supportedNoteFileTypes: [...DEFAULT_SUPPORTED_NOTE_FILE_TYPES],
+    allowIframeScripts: false,
   };
 }
 
@@ -500,7 +532,6 @@ function App() {
   const [draggedSection, setDraggedSection] = useState<SectionId | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: SectionId; position: "before" | "after" } | null>(null);
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(getStoredSelectedBookmarkId());
-  const [draggedBookmarkId, setDraggedBookmarkId] = useState<string | null>(null);
   const [draggedNoteSourcePath, setDraggedNoteSourcePath] = useState<string | null>(null);
   const draggedNoteSourcePathRef = useRef<string | null>(null);
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(getStoredBookmarkExpandedFolderIds);
@@ -528,6 +559,7 @@ function App() {
   const [pendingEditorScrollRatio, setPendingEditorScrollRatio] = useState(0);
   const [noteSaveState, setNoteSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [noteSaveError, setNoteSaveError] = useState<string | null>(null);
+  const [isUnsavedCloseDialogOpen, setIsUnsavedCloseDialogOpen] = useState(false);
   const [bookmarkDialog, setBookmarkDialog] = useState<BookmarkDialogState>({ kind: "closed" });
   const [noteCreationDialog, setNoteCreationDialog] = useState<NoteCreationDialogState>({ kind: "closed" });
   const [pendingRecentDocuments, setPendingRecentDocuments] = useState<RecentDocumentEntry[] | null>(null);
@@ -661,6 +693,7 @@ function App() {
     currentSelectedNoteNodeId: selectedNoteNodeId,
     onSelectedNoteNodeIdChange: setSelectedNoteNodeId,
     onSyncQueueChange: setPendingSyncCount,
+    supportedNoteFileTypes: prefs.supportedNoteFileTypes,
   });
   const {
     bookmarkTree,
@@ -1055,6 +1088,7 @@ function App() {
   
   const isMarkdownImmersive = (Boolean(selectedNote) || isNoteEditing) && !shouldShowPreviewInPanel;
   const canEditSelectedNote = canEditNote(selectedNote);
+  const canTrashSelectedNote = canTrashNote(selectedNote);
   const isNoteDraftDirty = Boolean(selectedNote && isNoteEditing && noteDraft !== selectedNote.content);
   const selectedNoteDisplayTitle = selectedNote ? getNoteSourceFileName(selectedNote) || selectedNote.title : "";
   const showSearchResultsPanel = !isMarkdownImmersive && isSearchPanelOpen;
@@ -1084,6 +1118,7 @@ function App() {
 
   useEffect(() => {
     setIsNoteEditing(false);
+    setIsUnsavedCloseDialogOpen(false);
     setNoteDraft(selectedNote?.content ?? "");
     setImmersiveZoomPercent(100);
     setEditorSplitPercent(50);
@@ -1184,13 +1219,13 @@ function App() {
   }
 
   function renderNoteViewerDocumentActions() {
-    if (!canEditSelectedNote) {
+    if (!canTrashSelectedNote && !canEditSelectedNote) {
       return null;
     }
 
     return (
       <>
-        {selectedNote?.sourcePath ? (
+        {canTrashSelectedNote && selectedNote?.sourcePath ? (
           <button
             aria-label="Move to trash"
             className="icon-action"
@@ -1199,6 +1234,17 @@ function App() {
             type="button"
           >
             <Trash2 size={16} />
+          </button>
+        ) : null}
+        {canEditSelectedNote ? (
+          <button
+            aria-label="Edit note"
+            className="icon-action markdown-body__edit"
+            onClick={handleStartNoteEditing}
+            title="Edit note"
+            type="button"
+          >
+            <FileCode2 size={16} />
           </button>
         ) : null}
       </>
@@ -2002,6 +2048,11 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
         return;
       }
 
+      if (isEscapeKey && isUnsavedCloseDialogOpen) {
+        setIsUnsavedCloseDialogOpen(false);
+        return;
+      }
+
       if (isEscapeKey && noteCreationDialog.kind !== "closed") {
         setNoteCreationDialog({ kind: "closed" });
         return;
@@ -2083,7 +2134,11 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       if (isNoteEditing) {
         if (!isNoteDraftDirty) {
           handleCancelNoteEditing();
+          handleCloseSelectedNote();
+          return;
         }
+
+        void handleCloseNoteEditor();
         return;
       }
 
@@ -2097,6 +2152,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [
     handleCancelNoteEditing,
+    handleCloseNoteEditor,
     handleCloseSelectedNote,
     handleStartNoteEditing,
     isCommandPaletteOpen,
@@ -2111,6 +2167,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
     isPrefsOpen,
     isStarredPanelOpen,
     isRecentPanelOpen,
+    isUnsavedCloseDialogOpen,
     openFeedPopup,
     canEditSelectedNote,
     selectedNote,
@@ -2327,10 +2384,6 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       onSetSectionColor={section === "notes" ? handleSetNoteSectionColor : undefined}
       onSelectFolder={navigateNoteSelection}
       onRenameNote={section === "notes" ? handleRenameNoteFile : undefined}
-      onEditNote={(note) => {
-        navigateNoteSelection(note.id);
-        handleStartNoteEditing();
-      }}
       onOpenNoteHistory={(note) => {
         setVersionHistoryNote(note);
         setIsVersionHistoryOpen(true);
@@ -2346,6 +2399,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       }}
       onToggleNoteStar={handleToggleNoteStar}
       onToggleFolder={toggleNoteFolder}
+      allowIframeScripts={prefs.allowIframeScripts}
       previewContentScale={immersiveZoomPercent}
       previewSupplementary={
         (section === "wiki" || section === "bookmarks") && wikiUnfurl && !isNoteEditing
@@ -2585,10 +2639,40 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
   }
 
   function handleCancelNoteEditing() {
+    setIsUnsavedCloseDialogOpen(false);
     setNoteDraft(selectedNote?.content ?? "");
     setNoteSaveError(null);
     setNoteSaveState("idle");
     setIsNoteEditing(false);
+  }
+
+  async function handleCloseNoteEditor() {
+    if (!isNoteDraftDirty) {
+      handleCancelNoteEditing();
+      handleCloseSelectedNote();
+      return;
+    }
+
+    setIsUnsavedCloseDialogOpen(true);
+  }
+
+  function handleKeepEditingNote() {
+    setIsUnsavedCloseDialogOpen(false);
+  }
+
+  function handleDiscardNoteChanges() {
+    handleCancelNoteEditing();
+    handleCloseSelectedNote();
+  }
+
+  async function handleSaveAndCloseNoteEditor() {
+    const saved = await handleSaveNoteEdits();
+    if (!saved) {
+      return;
+    }
+
+    handleCancelNoteEditing();
+    handleCloseSelectedNote();
   }
 
   function handleCloseSelectedNote() {
@@ -2695,7 +2779,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
 
   async function handleSaveNoteEdits() {
     if (!selectedNote?.sourcePath || !canEditSelectedNote) {
-      return;
+      return false;
     }
 
     // Snapshot the current content before overwriting.
@@ -2723,7 +2807,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
           setNoteSaveState("error");
           setNoteSaveError("Conflict detected. Server version loaded; your draft was saved to local history.");
           setNotesStatus("Note conflict detected");
-          return;
+          return false;
         }
 
         throw new Error(result.error ?? "Failed to save note");
@@ -2731,11 +2815,13 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       setNoteSaveState("saved");
       setNotesStatus("queued" in result && result.queued ? `${selectedNote.title} queued for sync` : `Saved ${selectedNote.title}`);
       window.setTimeout(() => setNoteSaveState((current) => (current === "saved" ? "idle" : current)), 1400);
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to save note";
       setNoteSaveState("error");
       setNoteSaveError(message);
       setNotesStatus("Note save failed");
+      return false;
     }
   }
 
@@ -3095,35 +3181,6 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
     setBookmarkDialog({ kind: "add-bookmark", title: "", url: "", description: "" });
   }
 
-  function handleEditNode(nodeId: string) {
-    const node = findNodeById(bookmarkTree, nodeId);
-    if (!node) {
-      return;
-    }
-
-    if (node.type === "folder") {
-      setBookmarkDialog({ kind: "edit-folder", nodeId, title: node.title });
-      return;
-    }
-
-    setBookmarkDialog({
-      kind: "edit-bookmark",
-      nodeId,
-      title: node.title,
-      url: node.url,
-      description: node.description ?? "",
-    });
-  }
-
-  function handleDeleteNode(nodeId: string) {
-    const node = findNodeById(bookmarkTree, nodeId);
-    if (!node) {
-      return;
-    }
-
-    setBookmarkDialog({ kind: "delete", nodeId, title: node.title });
-  }
-
   function handleBookmarkDialogClose() {
     setBookmarkDialog({ kind: "closed" });
   }
@@ -3227,33 +3284,6 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
     );
     void persistBookmarkTree(nextTree, "Bookmark updated");
     handleBookmarkDialogClose();
-  }
-
-  function handleDropOnNode(targetId: string, placement: "before" | "inside") {
-    if (!draggedBookmarkId || draggedBookmarkId === targetId) {
-      return;
-    }
-
-    const nextTree = moveBookmarkNode(bookmarkTree, draggedBookmarkId, targetId, placement);
-    if (nextTree === bookmarkTree) {
-      setDraggedBookmarkId(null);
-      return;
-    }
-
-    setDraggedBookmarkId(null);
-    void persistBookmarkTree(nextTree, "Bookmark order saved");
-  }
-
-  function toggleFolder(folderId: string) {
-    setExpandedFolderIds((current) => {
-      const next = new Set(current);
-      if (next.has(folderId)) {
-        next.delete(folderId);
-      } else {
-        next.add(folderId);
-      }
-      return next;
-    });
   }
 
   function handleSearchInputChange(value: string) {
@@ -3537,14 +3567,23 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
   async function handleTrashNote(note: Note) {
     if (!note.sourcePath) return;
     try {
-      await fetch(`${sidebarApiBase}/api/docs/trash`, {
+      const response = await fetch(`${sidebarApiBase}/api/docs/trash`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sourcePath: note.sourcePath }),
       });
+
+      if (!response.ok) {
+        const data = await response.json() as { error?: string };
+        window.alert(data.error ?? "Failed to move note to trash");
+        return;
+      }
+
       await loadNotes();
       await loadTrashEntries();
-    } catch { /* ignore */ }
+    } catch {
+      window.alert("Failed to move note to trash");
+    }
   }
 
   async function handleRestoreFromTrash(id: string) {
@@ -4955,11 +4994,13 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                       >
                         {isNoteEditing ? (
                           <MarkdownEditor
+                            allowIframeScripts={prefs.allowIframeScripts}
+                            canSave={isNoteDraftDirty}
                             documentPath={selectedNote.sourcePath || selectedNote.title}
                             noteSourcePath={selectedNote.sourcePath}
                             initialScrollRatio={pendingEditorScrollRatio}
                             markdown={noteDraft}
-                            onCancel={handleCancelNoteEditing}
+                            onClose={() => void handleCloseNoteEditor()}
                             onChange={setNoteDraft}
                             onZoomIn={handleViewerZoomIn}
                             onZoomOut={handleViewerZoomOut}
@@ -4993,8 +5034,10 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                                   isImmersive={isMarkdownImmersive}
                                   markdown={selectedNote.content}
                                   noteSourcePath={selectedNote.sourcePath}
+                                  allowIframeScripts={prefs.allowIframeScripts}
                                   toolbarLeading={showDetachedStandaloneNoteToolbar ? undefined : notePreviewToolbarLeading}
                                   toolbarActions={showDetachedStandaloneNoteToolbar ? undefined : standaloneNoteViewerToolbarActions}
+                                  useSandboxFrame
                                 />
                               </div>
                             ) : null}
@@ -5179,8 +5222,10 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
               </div>
             ) : (
               <MarkdownContent
+                allowIframeScripts={prefs.allowIframeScripts}
                 isImmersive={isMarkdownImmersive}
                 markdown={viewerContent.markdown}
+                useSandboxFrame
               />
             )}
           </div>
@@ -5639,6 +5684,14 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
           cancelLabel="No, keep it"
           onConfirm={() => { void handleTrashNote(trashConfirmNote); setTrashConfirmNote(null); }}
           onCancel={() => setTrashConfirmNote(null)}
+        />
+      ) : null}
+      {isUnsavedCloseDialogOpen ? (
+        <UnsavedChangesDialog
+          isSaving={noteSaveState === "saving"}
+          onDiscard={handleDiscardNoteChanges}
+          onKeepEditing={handleKeepEditingNote}
+          onSave={() => void handleSaveAndCloseNoteEditor()}
         />
       ) : null}
       {isVersionHistoryOpen && versionHistoryNote ? (
@@ -6166,25 +6219,6 @@ function countFolders(tree: BookmarkNode[]): number {
   }, 0);
 }
 
-function getBookmarkFolderTrailIds(tree: BookmarkNode[], targetId: string, trail: string[] = []): string[] {
-  for (const node of tree) {
-    if (node.id === targetId) {
-      return trail;
-    }
-
-    if (node.type !== "folder") {
-      continue;
-    }
-
-    const nextTrail = getBookmarkFolderTrailIds(node.children, targetId, [...trail, node.id]);
-    if (nextTrail.length > 0 || node.children.some((child) => child.id === targetId)) {
-      return nextTrail.length > 0 ? nextTrail : [...trail, node.id];
-    }
-  }
-
-  return [];
-}
-
 function findNodeById(tree: BookmarkNode[], nodeId: string): BookmarkNode | null {
   for (const node of tree) {
     if (node.id === nodeId) {
@@ -6266,93 +6300,6 @@ function removeNodeById(tree: BookmarkNode[], nodeId: string): BookmarkNode[] {
     .map((node) =>
       node.type === "folder" ? { ...node, children: removeNodeById(node.children, nodeId) } : node,
     );
-}
-
-function moveBookmarkNode(
-  tree: BookmarkNode[],
-  sourceId: string,
-  targetId: string,
-  placement: "before" | "inside",
-): BookmarkNode[] {
-  const sourceNode = findNodeById(tree, sourceId);
-  if (!sourceNode || sourceId === targetId) {
-    return tree;
-  }
-
-  if (sourceNode.type === "folder" && findNodeById(sourceNode.children, targetId)) {
-    return tree;
-  }
-
-  const [prunedTree, extractedNode] = extractNode(tree, sourceId);
-  if (!extractedNode) {
-    return tree;
-  }
-
-  if (placement === "inside") {
-    return insertNodeIntoFolder(prunedTree, targetId, extractedNode);
-  }
-
-  return insertNodeBefore(prunedTree, targetId, extractedNode);
-}
-
-function extractNode(tree: BookmarkNode[], nodeId: string): [BookmarkNode[], BookmarkNode | null] {
-  let extracted: BookmarkNode | null = null;
-
-  const nextTree = tree.reduce<BookmarkNode[]>((accumulator, node) => {
-    if (node.id === nodeId) {
-      extracted = node;
-      return accumulator;
-    }
-
-    if (node.type === "folder") {
-      const [children, nested] = extractNode(node.children, nodeId);
-      if (nested) {
-        extracted = nested;
-      }
-      accumulator.push({ ...node, children });
-      return accumulator;
-    }
-
-    accumulator.push(node);
-    return accumulator;
-  }, []);
-
-  return [nextTree, extracted];
-}
-
-function insertNodeBefore(tree: BookmarkNode[], targetId: string, nodeToInsert: BookmarkNode): BookmarkNode[] {
-  const [nextTree, inserted] = insertNodeBeforeInternal(tree, targetId, nodeToInsert);
-  return inserted ? nextTree : [...tree, nodeToInsert];
-}
-
-function insertNodeBeforeInternal(
-  tree: BookmarkNode[],
-  targetId: string,
-  nodeToInsert: BookmarkNode,
-): [BookmarkNode[], boolean] {
-  let inserted = false;
-
-  const nextTree = tree.reduce<BookmarkNode[]>((accumulator, node) => {
-    if (node.id === targetId) {
-      inserted = true;
-      accumulator.push(nodeToInsert, node);
-      return accumulator;
-    }
-
-    if (node.type === "folder") {
-      const [children, childInserted] = insertNodeBeforeInternal(node.children, targetId, nodeToInsert);
-      if (childInserted) {
-        inserted = true;
-        accumulator.push({ ...node, children });
-        return accumulator;
-      }
-    }
-
-    accumulator.push(node);
-    return accumulator;
-  }, []);
-
-  return [nextTree, inserted];
 }
 
 function buildGeneratedWikiFromBookmarks(bookmarks: BookmarkItem[]) {

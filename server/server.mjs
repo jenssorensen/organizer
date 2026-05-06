@@ -45,6 +45,8 @@ let hasDocsSource = false;
 let isMetaDataReady = false;
 const defaultOrder = ["notes", "bookmarks", "todo", "starred", "recent"];
 const defaultBookmarkTree = [];
+const SUPPORTED_NOTE_FILE_TYPES = new Set([".md", ".html", ".mhtml", ".txt"]);
+const DEFAULT_SUPPORTED_NOTE_FILE_TYPES = [".md"];
 const port = Number(process.env.PORT || 3532);
 const sseClients = new Set();
 const pendingChangeTimers = new Map();
@@ -781,7 +783,9 @@ async function handleNotes(request, response) {
 
   if (request.method === "GET") {
     try {
-      const notes = await readNotesCollection();
+      const requestUrl = new URL(request.url, "http://127.0.0.1");
+      const supportedNoteFileTypes = sanitizeSupportedNoteFileTypes(requestUrl.searchParams.get("supportedExtensions"));
+      const notes = await readNotesCollection({ supportedNoteFileTypes });
       response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
       response.end(JSON.stringify(notes, null, 2));
     } catch {
@@ -1229,10 +1233,14 @@ async function handleDocsFile(url, request, response) {
     }
 
     const contents = await readFile(absolutePath);
+    const contentType = getContentType(absolutePath);
     response.writeHead(200, {
-      "Content-Type": getContentType(absolutePath),
+      "Content-Type": contentType,
       "Content-Length": contents.length,
       "Cache-Control": "private, max-age=300",
+      "Content-Disposition": getContentDisposition(absolutePath, contentType),
+      "Content-Security-Policy": "sandbox allow-downloads; default-src 'self' data: blob: https: http:; script-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'",
+      "X-Content-Type-Options": "nosniff",
     });
     response.end(contents);
   } catch (error) {
@@ -2060,6 +2068,7 @@ function getContentType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   const contentTypes = {
     ".html": "text/html; charset=utf-8",
+    ".mhtml": "multipart/related",
     ".css": "text/css; charset=utf-8",
     ".js": "application/javascript; charset=utf-8",
     ".mjs": "application/javascript; charset=utf-8",
@@ -2085,6 +2094,17 @@ function getContentType(filePath) {
     ".md": "text/markdown; charset=utf-8",
   };
   return contentTypes[ext] || "application/octet-stream";
+}
+
+function getContentDisposition(filePath, contentType) {
+  const fileName = path.basename(filePath).replace(/\"/g, "");
+  const isInlinePreview =
+    contentType.startsWith("text/html") ||
+    contentType.startsWith("multipart/related") ||
+    contentType.startsWith("text/plain") ||
+    contentType.startsWith("text/markdown");
+
+  return `${isInlinePreview ? "inline" : "attachment"}; filename="${fileName}"`;
 }
 
 async function ensureSidebarOrderFile() {
@@ -2175,29 +2195,7 @@ function resolveNoteAssetAbsolutePath(relativePath) {
 }
 
 function resolveNoteAbsolutePath(normalizedPath) {
-  const importedPrefix = "__imported__/";
-  if (normalizedPath.startsWith(importedPrefix)) {
-    const rest = normalizedPath.slice(importedPrefix.length);
-    const slashIndex = rest.indexOf("/");
-    if (slashIndex === -1) {
-      throw new Error("Invalid imported note path");
-    }
-    const folderName = rest.slice(0, slashIndex);
-    const innerPath = rest.slice(slashIndex + 1);
-    const matchingDir = additionalDocsDirs.find((d) => path.basename(d) === folderName);
-    if (!matchingDir) {
-      throw new Error(`Imported folder "${folderName}" is not registered`);
-    }
-    const absolutePath = path.resolve(matchingDir, innerPath);
-    const normalizedDir = path.resolve(matchingDir);
-    if (!absolutePath.startsWith(`${normalizedDir}${path.sep}`) && absolutePath !== normalizedDir) {
-      throw new Error("Note path must stay inside the imported folder");
-    }
-    return absolutePath;
-  }
-
-  const { absolutePath } = resolveEditableDocPath(docsDir, normalizedPath);
-  return absolutePath;
+  return resolveNoteAssetAbsolutePath(normalizedPath);
 }
 
 async function loadDocsSource() {
@@ -2236,13 +2234,15 @@ async function loadDocsSource() {
   }
 }
 
-async function readNotesCollection() {
+async function readNotesCollection({ supportedNoteFileTypes = DEFAULT_SUPPORTED_NOTE_FILE_TYPES } = {}) {
   if (!docsDir) {
     return { tree: [], notes: [], docsFolder: null, additionalFolders: [] };
   }
 
   const notes = [];
-  const primaryTree = await readDocsTree(docsDir, "", notes);
+  const primaryTree = await readDocsTree(docsDir, "", notes, {
+    supportedFileExtensions: supportedNoteFileTypes,
+  });
 
   if (additionalDocsDirs.length === 0) {
     const starredNotes = await readStarredNotes();
@@ -2271,7 +2271,9 @@ async function readNotesCollection() {
     const folderName = path.basename(additionalDir);
     const prefix = `__imported__/${folderName}`;
     // Pass prefix as initial relativePath so all folder IDs and note IDs are namespaced
-    const additionalTree = await readDocsTree(additionalDir, prefix, additionalNotes);
+    const additionalTree = await readDocsTree(additionalDir, prefix, additionalNotes, {
+      supportedFileExtensions: supportedNoteFileTypes,
+    });
 
     notes.push(...additionalNotes);
     tree.push({
@@ -2290,6 +2292,21 @@ async function readNotesCollection() {
     docsFolder: path.basename(docsDir),
     additionalFolders: additionalDocsDirs.map((d) => path.basename(d)),
   };
+}
+
+function sanitizeSupportedNoteFileTypes(rawValue) {
+  if (typeof rawValue !== "string" || !rawValue.trim()) {
+    return [...DEFAULT_SUPPORTED_NOTE_FILE_TYPES];
+  }
+
+  const normalized = Array.from(new Set(
+    rawValue
+      .split(",")
+      .map((entry) => entry.trim().toLowerCase())
+      .filter((entry) => SUPPORTED_NOTE_FILE_TYPES.has(entry)),
+  ));
+
+  return normalized.length > 0 ? normalized : [...DEFAULT_SUPPORTED_NOTE_FILE_TYPES];
 }
 
 async function saveUploadedDocs(targetPath, files) {
@@ -2781,10 +2798,11 @@ async function handleDocsTrash(url, request, response) {
 
       const entries = await readTrashMeta();
       const titleMatch = (await readFile(trashFilePath, "utf8")).match(/^#\s+(.+)$/m);
+      const fileExtension = path.extname(normalizedPath);
       entries.push({
         id,
         sourcePath: normalizedPath,
-        title: titleMatch?.[1] || path.basename(normalizedPath, ".md"),
+        title: titleMatch?.[1] || path.basename(normalizedPath, fileExtension),
         deletedAt: new Date().toISOString(),
         trashFileName,
       });

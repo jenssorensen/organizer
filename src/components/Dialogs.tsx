@@ -32,7 +32,12 @@ import {
   X,
 } from "lucide-react";
 import type { BookmarkDialogState, Note, NavItem, NoteCreationDialogState, QuickCaptureState, RestorePointSummary, SectionId, TodoItem } from "../types";
-import type { NoteVersion, AppPrefs } from "../appTypes";
+import {
+  SUPPORTED_NOTE_FILE_TYPES,
+  type NoteVersion,
+  type AppPrefs,
+  type SupportedNoteFileType,
+} from "../appTypes";
 
 const NOTE_TEMPLATES = [
   { id: "blank", label: "Blank", icon: FileText, preview: "Start with an empty document" },
@@ -945,6 +950,21 @@ function PreferencesDialog({
     }
   }
 
+  function toggleSupportedNoteFileType(fileType: SupportedNoteFileType) {
+    const nextTypes = prefs.supportedNoteFileTypes.includes(fileType)
+      ? prefs.supportedNoteFileTypes.filter((currentType) => currentType !== fileType)
+      : [...prefs.supportedNoteFileTypes, fileType];
+
+    if (nextTypes.length === 0) {
+      return;
+    }
+
+    onPrefsChange({
+      ...prefs,
+      supportedNoteFileTypes: SUPPORTED_NOTE_FILE_TYPES.filter((currentType) => nextTypes.includes(currentType)),
+    });
+  }
+
   return (
     <div className="dialog-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="dialog-card prefs-dialog" role="dialog" aria-modal="true" aria-label="Preferences">
@@ -1067,6 +1087,58 @@ function PreferencesDialog({
                           type="checkbox"
                           checked={prefs.showBacklinks}
                           onChange={(e) => onPrefsChange({ ...prefs, showBacklinks: e.target.checked })}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="prefs-row">
+                    <div className="prefs-row__icon">
+                      <Folder size={16} />
+                    </div>
+                    <div className="prefs-row__body">
+                      <p className="prefs-row__title">Supported note file types</p>
+                      <p className="prefs-row__desc">
+                        Choose which file extensions Organizer indexes as notes. At least one file type must stay enabled.
+                      </p>
+                      <div className="prefs-choice-list" role="group" aria-label="Supported note file types">
+                        {SUPPORTED_NOTE_FILE_TYPES.map((fileType) => {
+                          const isSelected = prefs.supportedNoteFileTypes.includes(fileType);
+
+                          return (
+                            <label
+                              className={`prefs-choice-pill ${isSelected ? "is-active" : ""}`}
+                              key={fileType}
+                            >
+                              <input
+                                checked={isSelected}
+                                onChange={() => toggleSupportedNoteFileType(fileType)}
+                                type="checkbox"
+                              />
+                              <span>{fileType}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="prefs-row">
+                    <div className="prefs-row__icon">
+                      <FileCode2 size={16} />
+                    </div>
+                    <div className="prefs-row__body">
+                      <label className="prefs-row__toggle">
+                        <div>
+                          <p className="prefs-row__title">Allow scripts in preview iframe</p>
+                          <p className="prefs-row__desc">
+                            Add <code>allow-scripts</code> to sandboxed note previews. Leave this off unless you trust the rendered content.
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={prefs.allowIframeScripts}
+                          onChange={(e) => onPrefsChange({ ...prefs, allowIframeScripts: e.target.checked })}
                         />
                       </label>
                     </div>
@@ -1930,10 +2002,73 @@ function ConfirmDialog({
   );
 }
 
+function UnsavedChangesDialog({
+  onDiscard,
+  onKeepEditing,
+  onSave,
+  isSaving = false,
+}: {
+  onDiscard: () => void;
+  onKeepEditing: () => void;
+  onSave: () => void;
+  isSaving?: boolean;
+}) {
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onKeepEditing();
+      return;
+    }
+
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (!isSaving) {
+        onSave();
+      }
+    }
+  }
+
+  return (
+    <div
+      className="dialog-backdrop"
+      role="presentation"
+      onClick={(event) => { if (event.target === event.currentTarget) onKeepEditing(); }}
+      onKeyDown={handleKeyDown}
+    >
+      <div
+        aria-labelledby="unsaved-changes-title"
+        aria-modal="true"
+        className="dialog-card"
+        role="alertdialog"
+      >
+        <div className="dialog-card__header">
+          <h3 id="unsaved-changes-title">Unsaved changes</h3>
+          <button aria-label="Keep editing" className="icon-action" onClick={onKeepEditing} type="button">
+            <X size={16} />
+          </button>
+        </div>
+        <p className="dialog-card__body">Save changes before closing this document?</p>
+        <div className="dialog-card__actions">
+          <button autoFocus className="mini-action" onClick={onKeepEditing} type="button">
+            Keep editing
+          </button>
+          <button className="mini-action" disabled={isSaving} onClick={onDiscard} type="button">
+            Discard
+          </button>
+          <button className="mini-action is-active" disabled={isSaving} onClick={onSave} type="button">
+            {isSaving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export {
   BookmarkDialog,
   CommandPalette,
   ConfirmDialog,
+  UnsavedChangesDialog,
   TagBrowserDialog,
   VersionHistoryDialog,
   BrokenLinksDialog,

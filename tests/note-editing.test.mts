@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import {
+  canTrashNote,
   canEditNote,
   clampEditorSplitPercent,
   getPreviewScrollTopForEditorSelection,
@@ -56,6 +57,7 @@ test("disallows editing generated or unsaved documents", () => {
   );
 
   assert.equal(canEditNote(null), false);
+  assert.equal(canTrashNote(null), false);
   assert.equal(
     canEditNote({
       id: "wiki-2",
@@ -68,6 +70,63 @@ test("disallows editing generated or unsaved documents", () => {
       sourcePath: "https://wiki.example.com/page",
     }),
     false,
+  );
+  assert.equal(
+    canTrashNote({
+      id: "wiki-2",
+      title: "External Wiki",
+      summary: "Summary",
+      tags: [],
+      updatedAt: "2026-03-25T00:00:00.000Z",
+      kind: "wiki",
+      content: "# Hello",
+      sourcePath: "https://wiki.example.com/page",
+    }),
+    false,
+  );
+});
+
+test("allows trashing local file-backed notes regardless of extension", () => {
+  assert.equal(
+    canTrashNote({
+      id: "note-html",
+      title: "HTML Doc",
+      summary: "Summary",
+      tags: [],
+      updatedAt: "2026-03-25T00:00:00.000Z",
+      kind: "note",
+      content: "<html></html>",
+      sourcePath: "docs/reference.html",
+    }),
+    true,
+  );
+
+  assert.equal(
+    canTrashNote({
+      id: "note-mhtml",
+      title: "MHTML Doc",
+      summary: "Summary",
+      tags: [],
+      updatedAt: "2026-03-25T00:00:00.000Z",
+      kind: "note",
+      content: "MHTML",
+      sourcePath: "docs/capture.mhtml",
+    }),
+    true,
+  );
+
+  assert.equal(
+    canTrashNote({
+      id: "note-txt",
+      title: "Text Doc",
+      summary: "Summary",
+      tags: [],
+      updatedAt: "2026-03-25T00:00:00.000Z",
+      kind: "note",
+      content: "Plain text",
+      sourcePath: "docs/notes.txt",
+    }),
+    true,
   );
 });
 
@@ -128,24 +187,35 @@ test("keeps the active editor selection visible in preview", () => {
 test("app wires the note editor controls and split layout", async () => {
   const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
   const markdownComponentsSource = await readFile(new URL("../src/components/MarkdownComponents.tsx", import.meta.url), "utf8");
+  const stylesheet = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
 
   assert.match(appSource, /const STORED_MARKDOWN_EDITOR_PREVIEW_VISIBILITY_KEY = "organizer:markdown-editor-preview-visible";/);
   assert.match(appSource, /const STORED_MARKDOWN_EDITOR_PREVIEW_LAYOUT_KEY = "organizer:markdown-editor-preview-layout";/);
   assert.match(appSource, /const STORED_SELECTED_NOTES_NODE_KEY = "organizer:selected-notes-node";/);
   assert.match(appSource, /canEditNote\(selectedNote\)/);
+  assert.match(appSource, /canTrashNote\(selectedNote\)/);
   assert.match(appSource, /markdown-body__edit/);
+  assert.match(appSource, /aria-label="Move to trash"/);
   assert.match(appSource, /markdown-body__close/);
   assert.match(appSource, /markdown-body__toolbar-leading/);
   assert.match(appSource, /markdown-body__toolbar-title/);
   assert.match(appSource, /getNoteSourceFileName\(selectedNote\) \|\| selectedNote\.title/);
   assert.match(appSource, /const isNoteDraftDirty = Boolean\(selectedNote && isNoteEditing && noteDraft !== selectedNote\.content\);/);
+  assert.match(appSource, /async function handleCloseNoteEditor\(\)/);
+  assert.match(appSource, /const \[isUnsavedCloseDialogOpen, setIsUnsavedCloseDialogOpen\] = useState\(false\);/);
+  assert.match(appSource, /setIsUnsavedCloseDialogOpen\(true\);/);
+  assert.match(appSource, /function handleDiscardNoteChanges\(\) \{\s*handleCancelNoteEditing\(\);\s*handleCloseSelectedNote\(\);/);
+  assert.match(appSource, /async function handleSaveAndCloseNoteEditor\(\)/);
+  assert.match(appSource, /<UnsavedChangesDialog/);
   assert.match(appSource, /const isEscapeKey = event\.key === "Escape" \|\| event\.key === "Esc" \|\| event\.code === "Escape";/);
   assert.match(appSource, /if \(!isEscapeKey\) \{\s*return;\s*\}/);
-  assert.match(appSource, /if \(isNoteEditing\) \{\s*if \(!isNoteDraftDirty\) \{\s*handleCancelNoteEditing\(\);/);
+  assert.match(appSource, /if \(isNoteEditing\) \{\s*if \(!isNoteDraftDirty\) \{\s*handleCancelNoteEditing\(\);\s*handleCloseSelectedNote\(\);/);
+  assert.match(appSource, /void handleCloseNoteEditor\(\);/);
   assert.match(markdownComponentsSource, /markdown-editor/);
   assert.match(markdownComponentsSource, /markdown-editor__resize-handle/);
   assert.match(markdownComponentsSource, /markdown-editor__preview-body/);
   assert.match(markdownComponentsSource, /spellCheck/);
+  assert.match(markdownComponentsSource, /canSave: boolean;/);
   assert.match(markdownComponentsSource, /showPreview \? "Hide preview" : "Show preview"/);
   assert.match(markdownComponentsSource, /showPreview \? <EyeOff size=\{16\} \/> : <Eye size=\{16\} \/>/);
   assert.match(appSource, /showPreview=\{showMarkdownEditorPreview\}/);
@@ -159,16 +229,25 @@ test("app wires the note editor controls and split layout", async () => {
   assert.doesNotMatch(markdownComponentsSource, /title="Bullet list"/);
   assert.match(markdownComponentsSource, /className=\{`markdown-body__toolbar-side \$\{showPreview \? "" : "is-disabled"\}`\.trim\(\)\}/);
   assert.match(markdownComponentsSource, /disabled=\{saveState === "saving" \|\| !showPreview\}/);
+  assert.match(markdownComponentsSource, /aria-label=\{previewLayout === "side-by-side" \? "Below preview" : "Side by side"\}[\s\S]*disabled=\{saveState === "saving" \|\| !showPreview\}/);
+  assert.match(markdownComponentsSource, /className="markdown-body__toolbar-side markdown-editor__toolbar-actions"/);
+  assert.match(markdownComponentsSource, /className="icon-action markdown-editor__save"/);
+  assert.match(markdownComponentsSource, /disabled=\{saveState === "saving" \|\| !canSave\}/);
+  assert.match(markdownComponentsSource, /aria-label="Close document"/);
+  assert.match(markdownComponentsSource, /function SandboxedPreviewFrame\(/);
+  assert.match(markdownComponentsSource, /allowScripts \? "allow-scripts" : ""/);
+  assert.match(markdownComponentsSource, /useSandboxFrame\?: boolean;/);
+  assert.match(markdownComponentsSource, /buildDocumentPreviewSrcDoc\(markdown, noteSourcePath\)/);
+  assert.doesNotMatch(markdownComponentsSource, /Cancel/);
   assert.match(markdownComponentsSource, /markdown-editor__split--side-by-side/);
   assert.match(markdownComponentsSource, /showPreview \? \(/);
-  assert.match(appSource, /const \[editorSelection, setEditorSelection\] = useState\(0\);/);
-  assert.match(appSource, /setEditorSelection\(event\.currentTarget\.selectionStart\);/);
-  assert.match(appSource, /onKeyUp=\{handleEditorCursorActivity\}/);
-  assert.match(appSource, /onSelect=\{handleEditorCursorActivity\}/);
-  assert.match(appSource, /onScroll=\{handleEditorScroll\}/);
-  assert.match(appSource, /Save/);
-  assert.match(appSource, /Cancel/);
+  assert.match(markdownComponentsSource, /onScroll=\{handleEditorScroll\}/);
+  assert.match(appSource, /canSave=\{isNoteDraftDirty\}/);
+  assert.match(appSource, /onClose=\{\(\) => void handleCloseNoteEditor\(\)\}/);
+  assert.match(appSource, /toolbarActions=\{showDetachedStandaloneNoteToolbar \? undefined : standaloneNoteViewerToolbarActions\}[\s\S]*useSandboxFrame/);
   assert.match(stylesheet, /\.markdown-body__toolbar-side\.is-disabled \{[\s\S]*opacity: 0\.55;/);
+  assert.match(stylesheet, /\.markdown-editor__toolbar-actions \{[\s\S]*margin-left: auto;/);
+  assert.match(stylesheet, /\.markdown-body__sandbox-frame \{[\s\S]*width: 100%;/);
   assert.match(appSource, /const isMarkdownImmersive = \(Boolean\(selectedNote\) \|\| isNoteEditing\) && !shouldShowPreviewInPanel;/);
   assert.match(appSource, /consumeScopedSearchInputWithCurrentScopes\(value, searchScope, searchNoteSectionScope, searchFolderScopePath\)/);
   assert.match(appSource, /folder: \{searchFolderScopePath\.join\(" \/ "\)\}/);
@@ -181,7 +260,7 @@ test("folder overview renders child folders as an expandable tree", async () => 
 
   assert.match(noteComponentsSource, /note-folder-overview__tree/);
   assert.match(noteComponentsSource, /foldersOnly/);
-  assert.match(appSource, /navigationTreeNodes=\{activeNoteSection \? activeNoteSection\.children : activeNoteTree\}/);
+  assert.match(appSource, /navigationTreeNodes=\{visibleOverviewNavigationTreeNodes\}/);
   assert.match(noteComponentsSource, /Child folders/);
   assert.match(appSource, /showPersistentFolderOverview/);
   assert.match(appSource, /NoteFolderOverviewPanel/);
@@ -215,7 +294,8 @@ test("folder overview summary cards reuse the tree note row shell", async () => 
   assert.match(noteComponentsSource, /className=\{`note-leaf__tree-main\$\{note\.sourcePath \? " is-draggable" : ""\}`\}/);
   assert.match(noteComponentsSource, /className=\{`note-leaf__tree-top \$\{showTopActions \? "note-leaf__tree-top--with-actions" : ""\}`\}/);
   assert.match(noteComponentsSource, /note-leaf__summary-actions note-leaf__summary-actions--tree/);
-  assert.match(noteComponentsSource, /formatNoteTimestamp\(note\.updatedAt\) \· \{formatRecentViewCount\(noteViewCount\)\}/);
+  assert.doesNotMatch(noteComponentsSource, /aria-label="Edit note"/);
+  assert.match(noteComponentsSource, /formatNoteTimestamp\(note\.updatedAt\)[\s\S]*formatRecentViewCount\((noteViewCount|viewCount)\)/);
   assert.match(noteComponentsSource, /noteViewCount=\{noteViewCounts\.get\(`\$\{noteItem\.kind\}:\$\{noteItem\.id\}`\) \?\? 0\}/);
   assert.match(noteComponentsSource, /\{!isCompactView \? <span aria-hidden="true" className="note-leaf__separator" \/> : null\}/);
   assert.match(noteComponentsSource, /viewMode=\{noteRowViewMode\}/);
@@ -261,10 +341,11 @@ test("folder overview uses the same width logic for section navigation and notes
   const noteComponentsSource = await readFile(new URL("../src/components/NoteComponents.tsx", import.meta.url), "utf8");
 
   assert.match(noteComponentsSource, /function clampNotesPreviewSplitPercent\(value: number\) \{\s*return clampNotesOverviewSplitPercent\(value\);\s*\}/);
-  assert.match(noteComponentsSource, /function getResizableOverviewColumns\(splitPercent: number\) \{\s*return `minmax\(90px, \$\{splitPercent\}fr\) auto minmax\(260px, \$\{100 - splitPercent\}fr\)`;\s*\}/);
+  assert.match(noteComponentsSource, /function getResizableOverviewColumns\(splitPercent: number\) \{\s*return `minmax\(\$\{MIN_NOTE_TREE_MAIN_WIDTH\}px, \$\{splitPercent\}fr\) auto minmax\(260px, \$\{100 - splitPercent\}fr\)`;\s*\}/);
   assert.match(noteComponentsSource, /function getCollapsedOverviewColumns\(\) \{\s*return `\$\{COLLAPSED_OVERVIEW_PANE_WIDTH\}px minmax\(260px, 1fr\)`;\s*\}/);
-  assert.match(noteComponentsSource, /gridTemplateColumns: isTreeCollapsed\s*\? getCollapsedOverviewColumns\(\)\s*:\s*getResizableOverviewColumns\(overviewSplitPercent\)/);
-  assert.match(noteComponentsSource, /gridTemplateColumns: isNotesCollapsed\s*\? getCollapsedOverviewColumns\(\)\s*:\s*getResizableOverviewColumns\(previewSplitPercent\)/);
+  assert.match(noteComponentsSource, /gridTemplateColumns: getCollapsedOverviewColumns\(\)[\s\S]*gridTemplateColumns: getResizableOverviewColumns\(overviewSplitPercent\)/);
+  assert.match(noteComponentsSource, /getCollapsedOverviewColumns\(\)[\s\S]*getResizableOverviewColumns\(notesNavigationMode === "section" \? previewSplitPercent : overviewSplitPercent\)/);
+  assert.match(noteComponentsSource, /getCollapsedOverviewColumns\(\)[\s\S]*getResizableOverviewColumns\(previewSplitPercent\)/);
 });
 
 test("closing a selected document expands and selects its parent folder", async () => {
@@ -309,7 +390,7 @@ test("search popup stays above immersive document chrome", async () => {
   const stylesheet = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
 
   assert.doesNotMatch(appSource, /!isMarkdownImmersive && !isSearchPanelOpen && hasActiveSearch && !isSearchPopupDismissed/);
-  assert.match(appSource, /!isSearchPanelOpen && hasActiveSearch && !isSearchPopupDismissed/);
+  assert.match(appSource, /!isSearchScopePopupOpen && !isSearchPanelOpen && !isSearchDialogOpen && hasActiveSearch && !isSearchPopupDismissed/);
   assert.match(stylesheet, /\.topbar\s*\{[\s\S]*z-index:\s*60;/);
   assert.match(stylesheet, /\.topbar\s*\{[\s\S]*overflow:\s*visible;/);
   assert.match(stylesheet, /\.searchbar\s*\{[\s\S]*z-index:\s*61;/);
@@ -372,7 +453,7 @@ test("app restore point and note overview settings persist across reloads", asyn
   assert.match(appSource, /const \[section, setSection\] = useState<SectionId>\(getStoredActiveSection\(\)\);/);
   assert.match(appSource, /const \[selectedBookmarkId, setSelectedBookmarkId\] = useState<string \| null>\(getStoredSelectedBookmarkId\(\)\);/);
   assert.match(appSource, /const \[expandedFolderIds, setExpandedFolderIds\] = useState<Set<string>>\(getStoredBookmarkExpandedFolderIds\);/);
-  assert.match(appSource, /const \[bookmarkRenderMode, setBookmarkRenderMode\] = useState<"tree" \| "menu">\(getStoredBookmarkRenderMode\(\)\);/);
+  assert.match(appSource, /const \[bookmarkRenderMode, setBookmarkRenderMode\] = useState<"tree" \| "domain">\(getStoredBookmarkRenderMode\(\)\);/);
   assert.match(appSource, /const \[bookmarkCompactMode, setBookmarkCompactMode\] = useState\(getStoredBookmarkCompactMode\(\)\);/);
   assert.match(appSource, /const \[isSidebarCollapsed, setIsSidebarCollapsed\] = useState\(getStoredSidebarCollapsed\(\)\);/);
   assert.match(appSource, /window\.localStorage\.setItem\(STORED_ACTIVE_SECTION_KEY, section\);/);

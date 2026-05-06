@@ -14,8 +14,20 @@ export function canEditNote(note: EditableNote) {
   return isEditableNoteSourcePath(note.sourcePath);
 }
 
+export function isLocalNoteSourcePath(sourcePath: string) {
+  return !/^[a-z]+:\/\//i.test(sourcePath);
+}
+
+export function canTrashNote(note: EditableNote) {
+  if (!note || typeof note.sourcePath !== "string") {
+    return false;
+  }
+
+  return isLocalNoteSourcePath(note.sourcePath);
+}
+
 export function isEditableNoteSourcePath(sourcePath: string) {
-  return /\.md$/i.test(sourcePath) && !/^[a-z]+:\/\//i.test(sourcePath);
+  return /\.md$/i.test(sourcePath) && isLocalNoteSourcePath(sourcePath);
 }
 
 export function clampEditorSplitPercent(percent: number) {
