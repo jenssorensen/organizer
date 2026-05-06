@@ -1,8 +1,11 @@
 import path from "node:path";
 import { readFile, readdir, stat } from "node:fs/promises";
 
+const DEFAULT_SUPPORTED_NOTE_EXTENSIONS = [".md"];
+
 export async function readDocsTree(directoryPath, relativePath = "", notes = [], options = {}) {
-  const { readNote = toDocNote } = options;
+  const { readNote = toDocNote, supportedFileExtensions = DEFAULT_SUPPORTED_NOTE_EXTENSIONS } = options;
+  const supportedExtensions = toSupportedExtensionSet(supportedFileExtensions);
   let entries = [];
 
   try {
@@ -37,7 +40,7 @@ export async function readDocsTree(directoryPath, relativePath = "", notes = [],
       continue;
     }
 
-    if (!isMarkdownFile(entry.name)) {
+    if (!isSupportedNoteFile(entry.name, supportedExtensions)) {
       continue;
     }
 
@@ -92,7 +95,17 @@ export async function toDocNote(filePath, relativeFilePath) {
 }
 
 export function isMarkdownFile(fileName) {
-  return /\.md$/i.test(fileName);
+  return isSupportedNoteFile(fileName, DEFAULT_SUPPORTED_NOTE_EXTENSIONS);
+}
+
+export function isSupportedNoteFile(fileName, supportedFileExtensions = DEFAULT_SUPPORTED_NOTE_EXTENSIONS) {
+  const extension = path.extname(fileName).toLowerCase();
+  if (!extension) {
+    return false;
+  }
+
+  const supportedExtensions = toSupportedExtensionSet(supportedFileExtensions);
+  return supportedExtensions.has(extension);
 }
 
 export function createDocNoteId(relativePath) {
@@ -137,4 +150,19 @@ function slugify(value) {
 function isIgnorableDocsTreeError(error) {
   const code = typeof error === "object" && error !== null && "code" in error ? error.code : null;
   return code === "ENOENT" || code === "ENOTDIR" || code === "EACCES" || code === "EPERM";
+}
+
+function toSupportedExtensionSet(supportedFileExtensions) {
+  if (supportedFileExtensions instanceof Set) {
+    return supportedFileExtensions;
+  }
+
+  const normalized = Array.isArray(supportedFileExtensions)
+    ? supportedFileExtensions
+      .filter((extension) => typeof extension === "string")
+      .map((extension) => extension.trim().toLowerCase())
+      .filter(Boolean)
+    : DEFAULT_SUPPORTED_NOTE_EXTENSIONS;
+
+  return new Set(normalized.length > 0 ? normalized : DEFAULT_SUPPORTED_NOTE_EXTENSIONS);
 }

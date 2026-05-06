@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { ArrowUpDown, Check, Clock, Folder, GripVertical, PanelLeftClose, PanelLeftOpen, Pencil, Pin, PinOff, Plus, Star, Trash2, X } from "lucide-react";
+import { ArrowUpDown, Check, Clock, Folder, GripVertical, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Plus, Star, Trash2, X } from "lucide-react";
 import type { Note, NoteTreeNode, RecentDocumentEntry } from "../types";
 import type { NoteSectionSummary } from "../noteSections";
 import { sortFolderNotes, type FolderNotesSortMode } from "../noteSorting";
@@ -354,7 +354,6 @@ function NoteTreeItem({
   expandedFolderIds,
   searchStateByNodeId,
   selectedNodeId,
-  onEdit,
   onOpenHistory,
   onRenameFile,
   onSelect,
@@ -374,7 +373,6 @@ function NoteTreeItem({
   expandedFolderIds: Set<string>;
   searchStateByNodeId: Map<string, NoteTreeSearchState>;
   selectedNodeId: string | null;
-  onEdit?: (note: Note) => void;
   onOpenHistory?: (note: Note) => void;
   onRenameFile?: (note: Note, nextFileName: string) => Promise<void> | void;
   onSelect: (nodeId: string) => void;
@@ -545,7 +543,6 @@ function NoteTreeItem({
                 onNoteDragEnd={onNoteDragEnd}
                 onNoteDragStart={onNoteDragStart}
                 onNoteDrop={onNoteDrop}
-                onEdit={onEdit}
                 onOpenHistory={onOpenHistory}
                 onRenameFile={onRenameFile}
                 onSelect={onSelect}
@@ -576,11 +573,10 @@ function NoteTreeItem({
   const sourcePathTitle = note.sourcePath ? formatNoteTargetLocation(note.sourcePath) : undefined;
   const viewCount = noteViewCounts.get(`${note.kind}:${note.id}`) ?? 0;
   const isPinned = pinnedNoteIds.has(note.id);
-  const showEdit = typeof onEdit === "function" && canEditNote(note) && Boolean(note.sourcePath);
   const showHistory = typeof onOpenHistory === "function" && canEditNote(note) && Boolean(note.sourcePath);
   const showPinnedToggle = typeof onTogglePinned === "function";
   const showStar = canEditNote(note) && typeof onToggleStar === "function";
-  const showLeafActions = showEdit || showHistory || showPinnedToggle || showStar;
+  const showLeafActions = showHistory || showPinnedToggle || showStar;
   const isCompactView = viewMode === "compact";
 
   return (
@@ -654,20 +650,6 @@ function NoteTreeItem({
           ) : null}
           {showLeafActions ? (
             <div className="note-leaf__summary-actions note-leaf__summary-actions--tree">
-              {showEdit ? (
-                <button
-                  aria-label="Edit note"
-                  className="note-leaf__summary-action"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onEdit?.(note);
-                  }}
-                  title="Edit note"
-                  type="button"
-                >
-                  <Pencil size={13} />
-                </button>
-              ) : null}
               {showHistory ? (
                 <button
                   aria-label="View version history"
@@ -933,6 +915,7 @@ function SectionCustomizationDialog({
 function NoteFolderOverviewPanel({
   activeFolderNodeId,
   activeSection,
+  allowIframeScripts = false,
   allNotes,
   baseSections,
   childNotes,
@@ -958,7 +941,6 @@ function NoteFolderOverviewPanel({
   onSetSectionColor,
   onSelectFolder,
   onSelectNote,
-  onEditNote,
   onRenameNote,
   onOpenNoteHistory,
   onTogglePinnedNote,
@@ -976,6 +958,7 @@ function NoteFolderOverviewPanel({
 }: {
   activeFolderNodeId: string | null;
   activeSection: NoteSectionSummary | null;
+  allowIframeScripts?: boolean;
   allNotes: Note[];
   baseSections: NoteSectionSummary[];
   childNotes: Note[];
@@ -1002,7 +985,6 @@ function NoteFolderOverviewPanel({
   onSelectFolder: (nodeId: string | null) => void;
   onSelectNote: (nodeId: string | null) => void;
   onRenameNote?: (note: Note, nextFileName: string) => Promise<void> | void;
-  onEditNote?: (note: Note) => void;
   onOpenNoteHistory?: (note: Note) => void;
   onTogglePinnedNote?: (noteId: string, nextPinned: boolean) => void;
   onToggleNoteStar: (note: Note, nextStarred: boolean) => void;
@@ -1679,11 +1661,13 @@ function NoteFolderOverviewPanel({
           ) : null}
           <div className="note-folder-overview__preview markdown-body">
             <MarkdownContent
+              allowIframeScripts={allowIframeScripts}
               contentScale={previewContentScale}
               isImmersive={false}
               markdown={selectedNote.content}
               noteSourcePath={selectedNote.sourcePath}
               omitRootWrapper
+              useSandboxFrame
             />
           </div>
           {previewSupplementary ? <div className="note-folder-overview__preview-supplementary">{previewSupplementary}</div> : null}
@@ -2130,7 +2114,6 @@ function NoteFolderOverviewPanel({
                         onNoteDragStart={onNoteDragStart}
                         onNoteDrop={onMoveNote}
                         pinnedNoteIds={pinnedNoteIds}
-                        onEdit={onEditNote}
                         onOpenHistory={onOpenNoteHistory}
                         onRenameFile={onRenameNote}
                         onSelect={onSelectNote}
@@ -2294,7 +2277,6 @@ function NoteFolderOverviewPanel({
                               noteViewCount={noteViewCounts.get(`${noteItem.kind}:${noteItem.id}`) ?? 0}
                               onNoteDragEnd={onNoteDragEnd}
                               onNoteDragStart={onNoteDragStart}
-                              onEdit={onEditNote ? () => onEditNote(noteItem) : undefined}
                               onOpenHistory={onOpenNoteHistory ? () => onOpenNoteHistory(noteItem) : undefined}
                               onRenameFile={onRenameNote}
                               onSelect={() => onSelectNote(noteItem.id)}
@@ -2390,7 +2372,6 @@ function NoteSummaryCard({
   note,
   noteViewCount = 0,
   isSelected = false,
-  onEdit,
   onNoteDragEnd,
   onNoteDragStart,
   onOpenHistory,
@@ -2406,7 +2387,6 @@ function NoteSummaryCard({
   isSelected?: boolean;
   onNoteDragEnd?: () => void;
   onNoteDragStart?: (sourcePath: string) => void;
-  onEdit?: () => void;
   onOpenHistory?: () => void;
   onRenameFile?: (note: Note, nextFileName: string) => Promise<void> | void;
   onSelect: () => void;
@@ -2415,10 +2395,9 @@ function NoteSummaryCard({
   viewMode?: NoteRowViewMode;
 }) {
   const showStar = canEditNote(note) && typeof onToggleStar === "function";
-  const showEdit = typeof onEdit === "function" && canEditNote(note) && Boolean(note.sourcePath);
   const showHistory = typeof onOpenHistory === "function" && canEditNote(note) && Boolean(note.sourcePath);
   const showPinnedToggle = typeof onTogglePinned === "function";
-  const showTopActions = showEdit || showHistory || showPinnedToggle || showStar;
+  const showTopActions = showHistory || showPinnedToggle || showStar;
   const sourceFileName = getNoteSourceFileName(note);
   const sourcePathTitle = note.sourcePath ? formatNoteTargetLocation(note.sourcePath) : undefined;
   const isCompactView = viewMode === "compact";

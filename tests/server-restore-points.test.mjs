@@ -30,7 +30,7 @@ test("sanitizes restore point snapshots", () => {
     recentDocuments: [],
     savedSearches: [{ id: "smart-release", label: "Release", query: "tag:release" }],
     pinnedNoteIds: ["note-a"],
-    prefs: { feedsMode: "panel", showBacklinks: true, showEmptyFoldersAndSections: false },
+    prefs: { feedsMode: "panel", showBacklinks: true, showEmptyFoldersAndSections: false, showCollapsedSearchCard: true, searchInterface: "topbar", supportedNoteFileTypes: [".md", ".txt"], allowIframeScripts: true },
     sidebarOrder: ["notes", "wiki", "bookmarks", "todo", "starred", "recent"],
     starredNotePaths: ["Projects/Alpha.md"],
   });
@@ -39,6 +39,8 @@ test("sanitizes restore point snapshots", () => {
   assert.equal(snapshot.notes.length, 1);
   assert.deepEqual(snapshot.notes[0].tags, ["release"]);
   assert.equal(snapshot.prefs.feedsMode, "panel");
+  assert.deepEqual(snapshot.prefs.supportedNoteFileTypes, [".md", ".txt"]);
+  assert.equal(snapshot.prefs.allowIframeScripts, true);
 });
 
 test("rejects invalid restore point versions", () => {
@@ -66,7 +68,7 @@ test("summarizes restore point snapshots", () => {
     recentDocuments: [],
     savedSearches: [],
     pinnedNoteIds: [],
-    prefs: { feedsMode: "own-view", showBacklinks: false, showEmptyFoldersAndSections: false },
+    prefs: { feedsMode: "own-view", showBacklinks: false, showEmptyFoldersAndSections: false, showCollapsedSearchCard: true, searchInterface: "topbar", supportedNoteFileTypes: [".md"], allowIframeScripts: false },
     sidebarOrder: ["notes", "wiki", "bookmarks", "todo", "starred", "recent"],
     starredNotePaths: [],
   }));

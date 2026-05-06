@@ -12,7 +12,7 @@ try {
   const existingServer = await detectExistingOrganizerServer();
 
   if (existingServer === "organizer") {
-    console.log(`Organizer server already running on ${probeUrl}; reusing existing instance.`);
+    console.log(`Organizer server already running on ${probeUrl}; reusing existing instance. Restart it to pick up server-side code changes.`);
     process.exit(0);
   }
 

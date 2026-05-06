@@ -37,7 +37,7 @@ test("builds a restore point snapshot from restorable app data", () => {
     recentDocuments: [],
     savedSearches: [{ id: "smart-release", label: "Release", query: "tag:release" }],
     pinnedNoteIds: ["note-a"],
-    prefs: { feedsMode: "panel", showBacklinks: true, showEmptyFoldersAndSections: false, showCollapsedSearchCard: true, searchInterface: "topbar" },
+    prefs: { feedsMode: "panel", showBacklinks: true, showEmptyFoldersAndSections: false, showCollapsedSearchCard: true, searchInterface: "topbar", supportedNoteFileTypes: [".md"], allowIframeScripts: false },
     sidebarOrder: ["notes", "wiki", "bookmarks", "todo", "starred", "recent"],
     now: 123,
   });
@@ -58,7 +58,7 @@ test("creates a stable restore point fingerprint for unchanged content", () => {
     recentDocuments: [],
     savedSearches: [],
     pinnedNoteIds: [],
-    prefs: { feedsMode: "own-view", showBacklinks: false, showEmptyFoldersAndSections: false, showCollapsedSearchCard: true, searchInterface: "topbar" },
+    prefs: { feedsMode: "own-view", showBacklinks: false, showEmptyFoldersAndSections: false, showCollapsedSearchCard: true, searchInterface: "topbar", supportedNoteFileTypes: [".md"], allowIframeScripts: false },
     sidebarOrder: ["notes", "wiki", "bookmarks", "todo", "starred", "recent"],
     now: 123,
   });
@@ -133,7 +133,7 @@ test("summarizes restore point counts", () => {
     recentDocuments: [],
     savedSearches: [],
     pinnedNoteIds: [],
-    prefs: { feedsMode: "own-view", showBacklinks: false, showEmptyFoldersAndSections: false, showCollapsedSearchCard: true, searchInterface: "topbar" },
+    prefs: { feedsMode: "own-view", showBacklinks: false, showEmptyFoldersAndSections: false, showCollapsedSearchCard: true, searchInterface: "topbar", supportedNoteFileTypes: [".md"], allowIframeScripts: false },
     sidebarOrder: ["notes", "wiki", "bookmarks", "todo", "starred", "recent"],
     now: 123,
   });
