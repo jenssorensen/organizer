@@ -12,17 +12,17 @@ test("notes view exposes a New Document action wired to document creation", asyn
   const notesHookSource = await readFile(new URL("../src/useNotesData.ts", import.meta.url), "utf8");
 
   assert.match(appSource, /async function handleCreateDocument\(\)/);
-  assert.match(appSource, /creationPath: noteUploadTarget\.sourcePath/);
-  assert.match(appSource, /targetPath: formatNoteTargetLocation\(noteUploadTarget\.sourcePath\)/);
+  assert.match(appSource, /creationPath: noteCreationTarget\.sourcePath/);
+  assert.match(appSource, /targetPath: formatNoteTargetLocation\(noteCreationTarget\.sourcePath\)/);
   assert.match(appSource, /async function handleNoteCreationDialogConfirm\(\)/);
   assert.match(appSource, /await createNoteDocument\(creationPath, requestedName\)/);
   assert.match(appSource, />\s*New Document\s*</);
   assert.match(notesHookSource, /fetch\(`\$\{apiBase\}\/api\/docs\/create`/);
   assert.match(appSource, /function handleCreateSection\(\)/);
-  assert.match(appSource, />\s*New Section\s*</);
+  assert.match(appSource, /notesNavigationMode === "section" \? "New Section" : "New Folder"/);
   assert.match(appSource, /async function handleCreateFolder\(\)/);
   assert.match(appSource, /await createNoteFolder\(creationPath, requestedName\)/);
-  assert.match(appSource, />\s*New Folder\s*</);
+  assert.match(appSource, /onClick=\{notesNavigationMode === "section" \? handleCreateSection : handleCreateFolder\}/);
   assert.match(appSource, /if \(isEscapeKey && noteCreationDialog\.kind !== "closed"\) \{/);
   assert.match(appSource, /setNoteCreationDialog\(\{ kind: "closed" \}\);/);
   assert.match(notesHookSource, /fetch\(`\$\{apiBase\}\/api\/docs\/create-folder`/);

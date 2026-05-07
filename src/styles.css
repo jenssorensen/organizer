@@ -984,88 +984,6 @@ a {
   min-width: 145px;
 }
 
-.notes-actions {
-  display: inline-flex;
-  align-items: center;
-  align-self: stretch;
-  gap: 10px;
-  flex-wrap: wrap;
-  min-height: 72px;
-}
-
-.notes-actions .inline-actions {
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.notes-actions__button {
-  min-width: auto;
-}
-
-.notes-actions__button .notes-actions__label {
-  white-space: nowrap;
-}
-
-@media (max-width: 1660px) {
-  .notes-actions__button--view .notes-actions__label {
-    display: none;
-  }
-  .inline-actions .notes-actions__button--view {
-    padding: 8px;
-    min-width: 0;
-    flex: 0 0 auto;
-    width: 40px;
-  }
-}
-
-@media (max-width: 1520px) {
-  .notes-actions__button--section .notes-actions__label {
-    display: none;
-  }
-  .inline-actions .notes-actions__button--section {
-    padding: 8px;
-    min-width: 0;
-    flex: 0 0 auto;
-    width: 40px;
-  }
-}
-
-@media (max-width: 1380px) {
-  .notes-actions__button--document .notes-actions__label {
-    display: none;
-  }
-  .inline-actions .notes-actions__button--document {
-    padding: 8px;
-    min-width: 0;
-    flex: 0 0 auto;
-    width: 40px;
-  }
-}
-
-@media (max-width: 1240px) {
-  .notes-actions__button--folder .notes-actions__label {
-    display: none;
-  }
-  .inline-actions .notes-actions__button--folder {
-    padding: 8px;
-    min-width: 0;
-    flex: 0 0 auto;
-    width: 40px;
-  }
-}
-
-@media (max-width: 1100px) {
-  .notes-actions__button--upload .notes-actions__label {
-    display: none;
-  }
-  .inline-actions .notes-actions__button--upload {
-    padding: 8px;
-    min-width: 0;
-    flex: 0 0 auto;
-    width: 40px;
-  }
-}
-
 .recent-actions {
   display: inline-flex;
   align-items: flex-start;
@@ -1073,13 +991,7 @@ a {
   flex-wrap: wrap;
 }
 
-.notes-actions__target {
-  min-height: 40px;
-  border: 1px solid rgba(136, 167, 209, 0.12);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.notes-actions__target-text {
+.hero-card__header-subcopy--notes {
   border: 0;
   background: transparent;
   padding: 0;
@@ -2874,20 +2786,28 @@ button.note-breadcrumbs__item:hover {
   overflow-y: auto;
 }
 
-.note-folder-overview__section--tree {
+.note-folder-overview__section--overview {
   grid-column: span 1;
   min-width: 190px;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
-.note-folder-overview__section--tree .note-leaf--summary,
-.note-folder-overview__section--tree .note-leaf--tree,
+.note-folder-overview__overview-block {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.note-folder-overview__section--overview .note-leaf--summary,
+.note-folder-overview__section--overview .note-leaf--tree,
 .note-folder-overview__section--notes .note-leaf--summary,
 .note-folder-overview__section--notes .note-leaf--tree {
   min-width: 0;
 }
 
-.note-folder-overview__section--tree .note-leaf__tree-main,
+.note-folder-overview__section--overview .note-leaf__tree-main,
+.note-folder-overview__section--overview .note-leaf__main,
 .note-folder-overview__section--notes .note-leaf__tree-main,
 .note-folder-overview__section--notes .note-leaf__main {
   min-width: 0;
@@ -2896,13 +2816,13 @@ button.note-breadcrumbs__item:hover {
   overflow: hidden;
 }
 
-.note-folder-overview__section--tree .note-leaf__tree-top,
+.note-folder-overview__section--overview .note-leaf__tree-top,
 .note-folder-overview__section--notes .note-leaf__tree-top {
   min-width: 0;
   overflow: hidden;
 }
 
-.note-folder-overview__section--tree .note-leaf__title,
+.note-folder-overview__section--overview .note-leaf__title,
 .note-folder-overview__section--notes .note-leaf__title {
   min-width: 0;
   white-space: nowrap;
@@ -2910,7 +2830,7 @@ button.note-breadcrumbs__item:hover {
   text-overflow: ellipsis;
 }
 
-.note-folder-overview__section--tree .note-leaf__file,
+.note-folder-overview__section--overview .note-leaf__file,
 .note-folder-overview__section--notes .note-leaf__file {
   flex: 1;
   min-width: 0;
@@ -2920,7 +2840,7 @@ button.note-breadcrumbs__item:hover {
   text-overflow: ellipsis;
 }
 
-.note-folder-overview__section--tree .note-leaf__meta,
+.note-folder-overview__section--overview .note-leaf__meta,
 .note-folder-overview__section--notes .note-leaf__meta {
   min-width: 0;
   white-space: nowrap;
@@ -2929,23 +2849,15 @@ button.note-breadcrumbs__item:hover {
   overflow-wrap: normal;
 }
 
+.note-folder-overview__section--overview .note-leaf__main,
 .note-folder-overview__section--notes .note-leaf__main {
   width: 100%;
 }
 
 .note-folder-overview__section--notes {
   grid-column: span 1;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   min-width: 0;
-  overflow-x: hidden;
-}
-
-.note-folder-overview__section--notes.is-list {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.note-folder-overview__section--notes > .muted {
-  grid-column: 1 / -1;
+  overflow: hidden;
 }
 
 .note-folder-overview__notes-body {
@@ -3084,15 +2996,16 @@ button.note-breadcrumbs__item:hover {
 
 
 
-.note-folder-overview__section-header {
+.note-folder-overview__section-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   grid-column: 1 / -1;
+  container-type: inline-size;
 }
 
-.note-folder-overview__section.is-collapsed .note-folder-overview__section-header {
+.note-folder-overview__section.is-collapsed .note-folder-overview__section-toolbar {
   justify-content: flex-start;
 }
 
@@ -3101,6 +3014,38 @@ button.note-breadcrumbs__item:hover {
   align-items: center;
   gap: 8px;
   min-width: 0;
+  flex-wrap: wrap;
+}
+
+.note-folder-overview__header-intro {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.note-folder-overview__header-eyebrow {
+  margin: 0;
+  color: rgba(136, 167, 209, 0.72);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.note-folder-overview__section-leading-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.note-folder-overview__header-mode-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 10px;
+  margin-right: 2px;
+  border-right: 1px solid rgba(136, 167, 209, 0.16);
 }
 
 .note-folder-overview__section h4 {
@@ -3133,6 +3078,109 @@ button.note-breadcrumbs__item:hover {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.note-folder-overview__header-primary-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.note-folder-overview__header-utility-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 10px;
+  margin-left: 2px;
+  border-left: 1px solid rgba(136, 167, 209, 0.16);
+}
+
+.note-folder-overview__segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid rgba(136, 167, 209, 0.18);
+  border-radius: 999px;
+  background: rgba(12, 18, 28, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.note-folder-overview__segmented-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(230, 238, 252, 0.72);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.note-folder-overview__segmented-btn:hover,
+.note-folder-overview__segmented-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.note-folder-overview__segmented-btn.is-active {
+  background: rgba(120, 230, 198, 0.15);
+  color: var(--accent);
+}
+
+.note-folder-overview__segmented-label {
+  white-space: nowrap;
+}
+
+.note-folder-overview__header-action {
+  min-width: 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.note-folder-overview__header-action--adaptive {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  justify-content: center;
+  gap: 0;
+}
+
+.note-folder-overview__header-action-label {
+  white-space: nowrap;
+}
+
+.note-folder-overview__header-action-label--adaptive {
+  display: none;
+}
+
+@container (max-width: 520px) {
+  .note-folder-overview__header-mode-actions {
+    padding-right: 0;
+    margin-right: 0;
+    border-right: 0;
+  }
+
+  .note-folder-overview__header-utility-actions {
+    padding-left: 0;
+    margin-left: 0;
+    border-left: 0;
+  }
+
+  .note-folder-overview__segmented-label {
+    display: none;
+  }
+
+  .note-folder-overview__segmented-btn {
+    padding: 6px 8px;
+  }
 }
 
 .note-folder-overview__view-trigger {

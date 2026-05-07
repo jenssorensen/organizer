@@ -253,7 +253,7 @@ test("app wires the note editor controls and split layout", async () => {
   assert.match(appSource, /folder: \{searchFolderScopePath\.join\(" \/ "\)\}/);
 });
 
-test("folder overview renders child folders as an expandable tree", async () => {
+test("folder overview renders contextual header copy and an expandable tree", async () => {
   const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
   const noteComponentsSource = await readFile(new URL("../src/components/NoteComponents.tsx", import.meta.url), "utf8");
   const stylesheet = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
@@ -261,27 +261,55 @@ test("folder overview renders child folders as an expandable tree", async () => 
   assert.match(noteComponentsSource, /note-folder-overview__tree/);
   assert.match(noteComponentsSource, /foldersOnly/);
   assert.match(appSource, /navigationTreeNodes=\{visibleOverviewNavigationTreeNodes\}/);
-  assert.match(noteComponentsSource, /Child folders/);
+  assert.match(noteComponentsSource, /Organize structure/);
+  assert.match(noteComponentsSource, /in this folder/);
   assert.match(appSource, /showPersistentFolderOverview/);
   assert.match(appSource, /NoteFolderOverviewPanel/);
+  assert.match(appSource, /aria-label="Navigation mode"/);
+  assert.match(appSource, />\s*Folder\s*</);
+  assert.match(appSource, />\s*Section\s*</);
+  assert.match(noteComponentsSource, /showNavigationModeInSectionsHeader/);
+  assert.match(noteComponentsSource, /showNavigationModeInNavigationHeader/);
+  assert.match(noteComponentsSource, /note-folder-overview__section--overview/);
+  assert.doesNotMatch(noteComponentsSource, /note-folder-overview__section note-folder-overview__section--tree/);
+  assert.doesNotMatch(noteComponentsSource, /Change navigation view:/);
   assert.match(stylesheet, /\.note-folder-overview__tree/);
   assert.match(stylesheet, /\.note-folder-overview__tree-item/);
   assert.match(stylesheet, /\.note-folder-overview__grid\.has-sections\s*\{[\s\S]*?grid-template-columns:\s*minmax\(70px,\s*0\.72fr\)\s*auto\s*minmax\(0,\s*1fr\);/);
-  assert.match(stylesheet, /\.note-folder-overview__section--notes\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
+  assert.match(stylesheet, /\.note-folder-overview__section--overview\s*\{/);
 });
 
 test("folder overview notes section keeps the current list layout and sort controls", async () => {
   const noteComponentsSource = await readFile(new URL("../src/components/NoteComponents.tsx", import.meta.url), "utf8");
   const stylesheet = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
 
-  assert.match(noteComponentsSource, /note-folder-overview__section--notes is-list/);
+  assert.match(noteComponentsSource, /className=\{`note-folder-overview__notes-split \$\{isResizingPreview \? "is-resizing" : ""\}`\}/);
+  assert.match(noteComponentsSource, /note-folder-overview__section note-folder-overview__section--notes is-list/);
+  assert.match(noteComponentsSource, /isSectionView \? \(\s*<div className="note-folder-overview__overview-block note-folder-overview__overview-block--notes">/);
   assert.match(noteComponentsSource, /note-folder-overview__notes-body is-list/);
   assert.match(noteComponentsSource, /note-folder-overview__sort-menu/);
   assert.match(noteComponentsSource, /note-folder-overview__sort-trigger/);
-  assert.match(stylesheet, /\.note-folder-overview__section--notes\.is-list/);
+  assert.match(stylesheet, /\.note-folder-overview__overview-block\s*\{/);
+  assert.match(stylesheet, /\.note-folder-overview__notes-split\s*\{/);
+  assert.match(stylesheet, /\.note-folder-overview__section--notes\s*\{/);
   assert.match(stylesheet, /\.note-folder-overview__notes-body\.is-list/);
   assert.match(stylesheet, /\.note-folder-overview__sort-menu/);
   assert.match(stylesheet, /\.note-folder-overview__sort-trigger/);
+});
+
+test("section view renders notes in this section as a folder tree", async () => {
+  const noteComponentsSource = await readFile(new URL("../src/components/NoteComponents.tsx", import.meta.url), "utf8");
+
+  assert.doesNotMatch(noteComponentsSource, /sectionHeaderClassName/);
+  assert.doesNotMatch(noteComponentsSource, /note-folder-overview__section-header/);
+  assert.match(noteComponentsSource, /const directItemsHeading = notesNavigationMode === "section"/);
+  assert.match(noteComponentsSource, /\$\{capitalizedItemLabelPlural\} in this section/);
+  assert.match(noteComponentsSource, /notesNavigationMode === "section" \? \(/);
+  assert.match(noteComponentsSource, /className="note-folder-overview__tree note-folder-overview__notes-tree"/);
+  assert.match(noteComponentsSource, /<NoteTreeItem[\s\S]*?foldersOnly[\s\S]*?key=\{`\$\{folderNode\.id\}:\$\{index\}`\}/);
+  assert.match(noteComponentsSource, /foldersOnly=\{false\}/);
+  assert.match(noteComponentsSource, /key=\{`\$\{folderNode\.id\}:notes:\$\{index\}`\}/);
+  assert.match(noteComponentsSource, /No \$\{itemLabelPlural\} or subfolders in this section yet\./);
 });
 
 test("folder overview summary cards reuse the tree note row shell", async () => {
@@ -318,8 +346,9 @@ test("app preserves the current folder context when a selected note disappears",
   assert.match(notesDataSource, /resolveSelectedNoteNodeId\(\{[\s\S]*fallbackSelectedNoteNodeId,[\s\S]*tree: data\.tree,[\s\S]*\}\)/);
 });
 
-test("folder overview exposes a shared detailed and compact row view menu", async () => {
+test("folder overview keeps only the notes-list view menu", async () => {
   const noteComponentsSource = await readFile(new URL("../src/components/NoteComponents.tsx", import.meta.url), "utf8");
+  const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
   const stylesheet = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
 
   assert.match(noteComponentsSource, /type NoteRowViewMode = "detailed" \| "compact";/);
@@ -328,7 +357,16 @@ test("folder overview exposes a shared detailed and compact row view menu", asyn
   assert.match(noteComponentsSource, /window\.localStorage\.setItem\(STORED_NOTE_ROW_VIEW_MODE_KEY, noteRowViewMode\);/);
   assert.match(noteComponentsSource, /className="note-folder-overview__view-trigger"/);
   assert.match(noteComponentsSource, /Change note row view: \$\{activeNoteRowViewOption\.label\}/);
+  assert.match(appSource, /setNotesNavigationMode\("folder"\)/);
+  assert.match(appSource, /setNotesNavigationMode\("section"\)/);
+  assert.doesNotMatch(noteComponentsSource, /onChangeNavigationMode/);
   assert.match(stylesheet, /\.note-folder-overview__section-actions\s*\{/);
+  assert.match(stylesheet, /\.note-folder-overview__header-mode-actions\s*\{/);
+  assert.match(stylesheet, /\.note-folder-overview__segmented\s*\{/);
+  assert.match(stylesheet, /\.note-folder-overview__header-primary-actions\s*\{/);
+  assert.match(stylesheet, /\.note-folder-overview__header-action--adaptive\s*\{[\s\S]*width:\s*28px;[\s\S]*height:\s*28px;/);
+  assert.match(stylesheet, /\.note-folder-overview__header-action-label--adaptive\s*\{[\s\S]*display:\s*none;/);
+  assert.match(stylesheet, /\.note-folder-overview__header-utility-actions\s*\{/);
   assert.match(stylesheet, /\.note-folder-overview__view-trigger\s*\{/);
   assert.match(stylesheet, /\.note-leaf--compact \.note-leaf__file,/);
 });
@@ -360,9 +398,9 @@ test("folder overview uses the same width logic for section navigation and notes
   assert.match(noteComponentsSource, /function clampNotesPreviewSplitPercent\(value: number\) \{\s*return clampNotesOverviewSplitPercent\(value\);\s*\}/);
   assert.match(noteComponentsSource, /function getResizableOverviewColumns\(splitPercent: number\) \{\s*return `minmax\(\$\{MIN_NOTE_TREE_MAIN_WIDTH\}px, \$\{splitPercent\}fr\) auto minmax\(260px, \$\{100 - splitPercent\}fr\)`;\s*\}/);
   assert.match(noteComponentsSource, /function getCollapsedOverviewColumns\(\) \{\s*return `\$\{COLLAPSED_OVERVIEW_PANE_WIDTH\}px minmax\(260px, 1fr\)`;\s*\}/);
-  assert.match(noteComponentsSource, /gridTemplateColumns: getCollapsedOverviewColumns\(\)[\s\S]*gridTemplateColumns: getResizableOverviewColumns\(overviewSplitPercent\)/);
-  assert.match(noteComponentsSource, /getCollapsedOverviewColumns\(\)[\s\S]*getResizableOverviewColumns\(notesNavigationMode === "section" \? previewSplitPercent : overviewSplitPercent\)/);
-  assert.match(noteComponentsSource, /getCollapsedOverviewColumns\(\)[\s\S]*getResizableOverviewColumns\(previewSplitPercent\)/);
+  assert.match(noteComponentsSource, /gridTemplateColumns: \(isSectionView \? isOverviewPaneCollapsed : isTreeCollapsed\)[\s\S]*getResizableOverviewColumns\(isSectionView \? previewSplitPercent : overviewSplitPercent\)/);
+  assert.doesNotMatch(noteComponentsSource, /getResizableOverviewColumns\(notesNavigationMode === "section" \? previewSplitPercent : overviewSplitPercent\)/);
+  assert.match(noteComponentsSource, /className=\{`note-folder-overview__notes-split \$\{isResizingPreview \? "is-resizing" : ""\}`\}/);
 });
 
 test("closing a selected document expands and selects its parent folder", async () => {
