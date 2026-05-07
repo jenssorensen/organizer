@@ -354,6 +354,7 @@ function NoteTreeItem({
   expandedFolderIds,
   searchStateByNodeId,
   selectedNodeId,
+  onStartEditing,
   onOpenHistory,
   onRenameFile,
   onSelect,
@@ -373,6 +374,7 @@ function NoteTreeItem({
   expandedFolderIds: Set<string>;
   searchStateByNodeId: Map<string, NoteTreeSearchState>;
   selectedNodeId: string | null;
+  onStartEditing?: (note: Note, nodeId: string) => void;
   onOpenHistory?: (note: Note) => void;
   onRenameFile?: (note: Note, nextFileName: string) => Promise<void> | void;
   onSelect: (nodeId: string) => void;
@@ -543,6 +545,7 @@ function NoteTreeItem({
                 onNoteDragEnd={onNoteDragEnd}
                 onNoteDragStart={onNoteDragStart}
                 onNoteDrop={onNoteDrop}
+                onStartEditing={onStartEditing}
                 onOpenHistory={onOpenHistory}
                 onRenameFile={onRenameFile}
                 onSelect={onSelect}
@@ -591,6 +594,11 @@ function NoteTreeItem({
         onClick={() => {
           if (!isEditingFileName) {
             onSelect(node.id);
+          }
+        }}
+        onDoubleClick={() => {
+          if (!isEditingFileName) {
+            onStartEditing?.(note, node.id);
           }
         }}
         draggable={!!note.sourcePath && !isEditingFileName}
@@ -941,6 +949,7 @@ function NoteFolderOverviewPanel({
   onSetSectionColor,
   onSelectFolder,
   onSelectNote,
+  onStartEditingNote,
   onRenameNote,
   onOpenNoteHistory,
   onTogglePinnedNote,
@@ -987,6 +996,7 @@ function NoteFolderOverviewPanel({
   onSetSectionColor?: (sectionId: string, accentColor: string) => void;
   onSelectFolder: (nodeId: string | null) => void;
   onSelectNote: (nodeId: string | null) => void;
+  onStartEditingNote?: (note: Note, nodeId: string) => void;
   onRenameNote?: (note: Note, nextFileName: string) => Promise<void> | void;
   onOpenNoteHistory?: (note: Note) => void;
   onTogglePinnedNote?: (noteId: string, nextPinned: boolean) => void;
@@ -2566,6 +2576,7 @@ function NoteSummaryCard({
   onOpenHistory,
   onRenameFile,
   onSelect,
+  onStartEditing,
   onTogglePinned,
   onToggleStar,
   viewMode = "detailed",
@@ -2579,6 +2590,7 @@ function NoteSummaryCard({
   onOpenHistory?: () => void;
   onRenameFile?: (note: Note, nextFileName: string) => Promise<void> | void;
   onSelect: () => void;
+  onStartEditing?: () => void;
   onTogglePinned?: (nextPinned: boolean) => void;
   onToggleStar?: (nextStarred: boolean) => void;
   viewMode?: NoteRowViewMode;
@@ -2785,6 +2797,11 @@ function NoteSummaryCard({
         onClick={() => {
           if (!isEditingFileName) {
             onSelect();
+          }
+        }}
+        onDoubleClick={() => {
+          if (!isEditingFileName) {
+            onStartEditing?.();
           }
         }}
         onKeyDown={(event) => {

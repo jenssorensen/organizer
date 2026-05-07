@@ -4,6 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  getRecentDocumentViewKey,
   getRecentActivityTimestamp,
   mergeRecentDocuments,
   pruneRecentDocuments,
@@ -89,6 +90,53 @@ test("serializes recent documents into the server payload shape", () => {
   assert.deepEqual(payload, {
     entries: [entryA, entryB, entryTodo],
   } satisfies RecentDocumentPayload);
+});
+
+test("builds a stable recent document view key for identical rendered-document payloads", () => {
+  const baseKey = getRecentDocumentViewKey({
+    documentId: "note:a",
+    kind: "note",
+    title: "A",
+    subtitle: "notes",
+    preview: "preview",
+    snapshot: {
+      section: "notes",
+      selectedNoteNodeId: "node-a",
+      selectedBookmarkId: null,
+      selectedTodoId: null,
+    },
+  });
+
+  const samePayloadKey = getRecentDocumentViewKey({
+    documentId: "note:a",
+    kind: "note",
+    title: "A renamed",
+    subtitle: "notes updated",
+    preview: "preview updated",
+    snapshot: {
+      section: "notes",
+      selectedNoteNodeId: "node-a",
+      selectedBookmarkId: null,
+      selectedTodoId: null,
+    },
+  });
+
+  const differentSelectionKey = getRecentDocumentViewKey({
+    documentId: "note:a",
+    kind: "note",
+    title: "A",
+    subtitle: "notes",
+    preview: "preview",
+    snapshot: {
+      section: "notes",
+      selectedNoteNodeId: "node-b",
+      selectedBookmarkId: null,
+      selectedTodoId: null,
+    },
+  });
+
+  assert.equal(baseKey, samePayloadKey);
+  assert.notEqual(baseKey, differentSelectionKey);
 });
 
 test("merges recent activity by document and keeps the newest activity timestamp", () => {

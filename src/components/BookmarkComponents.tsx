@@ -2,6 +2,48 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { ChevronDown, ChevronRight, ExternalLink, Folder, GripVertical, Pencil, Star, Trash2 } from "lucide-react";
 import type { BookmarkNode } from "../types";
 
+const STORED_BOOKMARK_OVERVIEW_SPLIT_KEY = "organizer:bookmark-overview-split:v1";
+const MIN_BOOKMARK_TREE_WIDTH = 190;
+const RESIZE_HANDLE_RESERVED_WIDTH = 46;
+
+function clampBookmarkOverviewSplitPercent(value: number) {
+  return Math.min(52, Math.max(11, value));
+}
+
+function getStoredBookmarkOverviewSplitPercent() {
+  const defaultPercent = 42;
+  if (typeof window === "undefined") {
+    return defaultPercent;
+  }
+
+  const stored = Number(window.localStorage.getItem(STORED_BOOKMARK_OVERVIEW_SPLIT_KEY));
+  return Number.isFinite(stored) ? clampBookmarkOverviewSplitPercent(stored) : defaultPercent;
+}
+
+function getMinimumPaneSplitPercent(boundsWidth: number, minPaneWidth: number, minPercent: number, maxPercent: number) {
+  if (boundsWidth <= RESIZE_HANDLE_RESERVED_WIDTH) {
+    return minPercent;
+  }
+
+  const availableWidth = boundsWidth - RESIZE_HANDLE_RESERVED_WIDTH;
+  return Math.min(maxPercent, Math.max(minPercent, (minPaneWidth / availableWidth) * 100));
+}
+
+function clampPaneSplitPercentForBounds(
+  value: number,
+  boundsWidth: number,
+  minPaneWidth: number,
+  minPercent: number,
+  maxPercent: number,
+) {
+  const effectiveMinPercent = getMinimumPaneSplitPercent(boundsWidth, minPaneWidth, minPercent, maxPercent);
+  return Math.min(maxPercent, Math.max(effectiveMinPercent, value));
+}
+
+function getResizableOverviewColumns(splitPercent: number) {
+  return `minmax(${MIN_BOOKMARK_TREE_WIDTH}px, ${splitPercent}fr) auto minmax(260px, ${100 - splitPercent}fr)`;
+}
+
 type BookmarkFolderNode = Extract<BookmarkNode, { type: "folder" }>;
 type BookmarkLeafNode = Extract<BookmarkNode, { type: "bookmark" }>;
 
@@ -396,9 +438,12 @@ function BookmarkOverviewPanel({
   onSelect: (nodeId: string | null) => void;
   rootLabel?: string;
 }) {
-  const normalizedTree = normalizeBookmarkMenuRoots(tree);
+  const normalizedTree = useMemo(() => normalizeBookmarkMenuRoots(tree), [tree]);
+  const [overviewSplitPercent, setOverviewSplitPercent] = useState(getStoredBookmarkOverviewSplitPercent());
+  const [isResizingOverview, setIsResizingOverview] = useState(false);
   const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(() => collectBookmarkFolderIds(normalizedTree));
   const seenFolderIdsRef = useRef<Set<string>>(new Set());
+  const splitRef = useRef<HTMLDivElement | null>(null);
   const selectedTrail = selectedBookmarkId ? getBookmarkTreeTrail(normalizedTree, selectedBookmarkId) : [];
   const activeFolder = getActiveBookmarkFolder(selectedTrail);
   const activeChildren = activeFolder?.children ?? normalizedTree;
@@ -424,9 +469,46 @@ function BookmarkOverviewPanel({
       }
 
       seenFolderIdsRef.current = validFolderIds;
-      return next;
+      return areSetsEqual(current, next) ? current : next;
     });
   }, [normalizedTree]);
+
+  useEffect(() => {
+    window.localStorage.setItem(STORED_BOOKMARK_OVERVIEW_SPLIT_KEY, String(overviewSplitPercent));
+  }, [overviewSplitPercent]);
+
+  useEffect(() => {
+    const boundsWidth = splitRef.current?.getBoundingClientRect().width ?? 0;
+    setOverviewSplitPercent((current) => clampPaneSplitPercentForBounds(current, boundsWidth, MIN_BOOKMARK_TREE_WIDTH, 11, 52));
+  }, [normalizedTree]);
+
+  useEffect(() => {
+    if (!isResizingOverview) {
+      return;
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      const bounds = splitRef.current?.getBoundingClientRect();
+      if (!bounds) {
+        return;
+      }
+
+      const nextPercent = ((event.clientX - bounds.left) / bounds.width) * 100;
+      setOverviewSplitPercent(clampPaneSplitPercentForBounds(nextPercent, bounds.width, MIN_BOOKMARK_TREE_WIDTH, 11, 52));
+    }
+
+    function handlePointerUp() {
+      setIsResizingOverview(false);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [isResizingOverview]);
 
   function toggleFolder(folderId: string) {
     setCollapsedFolderIds((current) => {
@@ -440,9 +522,31 @@ function BookmarkOverviewPanel({
     });
   }
 
+  function handleResizeStart(event: React.PointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    setIsResizingOverview(true);
+  }
+
+  function handleResizeKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    const boundsWidth = splitRef.current?.getBoundingClientRect().width ?? 0;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setOverviewSplitPercent((current) => clampPaneSplitPercentForBounds(current - 3, boundsWidth, MIN_BOOKMARK_TREE_WIDTH, 11, 52));
+    }
+
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      setOverviewSplitPercent((current) => clampPaneSplitPercentForBounds(current + 3, boundsWidth, MIN_BOOKMARK_TREE_WIDTH, 11, 52));
+    }
+  }
+
   return (
     <div className="note-folder-overview bookmark-overview">
-      <div className="note-folder-overview__split bookmark-overview__split">
+      <div
+        className={`note-folder-overview__split bookmark-overview__split ${isResizingOverview ? "is-resizing" : ""}`}
+        ref={splitRef}
+        style={{ gridTemplateColumns: getResizableOverviewColumns(overviewSplitPercent) }}
+      >
         <section className="note-folder-overview__section note-folder-overview__section--tree">
           <div className="note-folder-overview__section-header">
             <div className="note-folder-overview__section-heading">
@@ -450,17 +554,29 @@ function BookmarkOverviewPanel({
             </div>
           </div>
           <div className="note-folder-overview__tree">
-            <div className="note-folder-overview__tree-item">
-              <button
-                className={`note-folder-overview__folder-button ${activeFolder ? "" : "is-active"}`.trim()}
-                onClick={() => onSelect(null)}
-                type="button"
-              >
-                <Folder size={14} />
-                <span>{rootLabel} ({countBookmarksInNodes(normalizedTree)})</span>
-              </button>
+            <div className={`tree-folder note-tree-folder ${activeFolder ? "" : "is-selected"}`.trim()}>
+              <div className="tree-folder__title">
+                <span
+                  className="tree-folder__label note-tree-folder__label"
+                  onClick={() => onSelect(null)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onSelect(null);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <span aria-hidden="true" className="folder-toggle folder-toggle--spacer" />
+                  <Folder size={16} />
+                  <span>
+                    {rootLabel} <span className="tree-folder__count">({countBookmarksInNodes(normalizedTree)})</span>
+                  </span>
+                </span>
+              </div>
               {activeChildFolders.length > 0 || normalizedTree.some((node) => node.type === "folder") ? (
-                <div className="note-folder-overview__tree-children">
+                <div className="tree-folder__children">
                   {normalizedTree
                     .filter((node): node is Extract<BookmarkNode, { type: "folder" }> => node.type === "folder")
                     .map((node) => (
@@ -479,6 +595,18 @@ function BookmarkOverviewPanel({
           </div>
         </section>
 
+        <button
+          aria-label="Resize bookmark overview panes"
+          aria-orientation="vertical"
+          className={`note-folder-overview__resize-handle ${isResizingOverview ? "is-active" : ""}`}
+          onKeyDown={handleResizeKeyDown}
+          onPointerDown={handleResizeStart}
+          role="separator"
+          type="button"
+        >
+          <span className="note-folder-overview__resize-line" />
+        </button>
+
         <section className="note-folder-overview__section note-folder-overview__section--notes is-list">
           <div className="note-folder-overview__section-header">
             <div className="note-folder-overview__section-heading">
@@ -488,20 +616,30 @@ function BookmarkOverviewPanel({
           <div className="note-folder-overview__notes-body is-list bookmark-overview__list">
             {activeChildBookmarks.length > 0 ? (
               activeChildBookmarks.map((node) => (
-                <article
-                  className={`bookmark-overview__item ${selectedBookmarkId === node.id ? "is-active" : ""}`.trim()}
-                  key={node.id}
-                >
-                  <button className="bookmark-overview__select" onClick={() => onSelect(node.id)} type="button">
+                <article className="bookmark-overview__item" key={node.id}>
+                  <button
+                    className={`note-leaf__main bookmark-overview__select ${selectedBookmarkId === node.id ? "is-selected" : ""}`.trim()}
+                    onClick={() => {
+                      onSelect(node.id);
+                      window.open(node.url, "_blank", "noopener,noreferrer");
+                    }}
+                    type="button"
+                  >
                     <span className="bookmark-overview__icon">
                       <BookmarkIcon icon={node.icon} title={node.title} />
                     </span>
                     <span className="bookmark-overview__body">
-                      <strong className="bookmark-overview__title">{node.title}</strong>
-                      <span className="bookmark-overview__meta">{node.domain}</span>
+                      <strong className="note-leaf__title">{node.title}</strong>
+                      <span className="note-leaf__meta">{node.domain}</span>
                     </span>
                   </button>
-                  <a className="icon-action" href={node.url} rel="noreferrer" target="_blank" title="Open bookmark">
+                  <a
+                    className="note-leaf__summary-action bookmark-overview__action"
+                    href={node.url}
+                    rel="noreferrer"
+                    target="_blank"
+                    title="Open bookmark"
+                  >
                     <ExternalLink size={14} />
                   </a>
                 </article>
@@ -535,12 +673,12 @@ function BookmarkOverviewTreeNode({
   const isCollapsed = collapsedFolderIds.has(node.id);
 
   return (
-    <div className="note-folder-overview__tree-item">
-      <div className="note-folder-overview__tree-row">
+    <div className={`tree-folder note-tree-folder ${activeFolderId === node.id ? "is-selected" : ""}`.trim()}>
+      <div className="tree-folder__title">
         {childFolders.length > 0 ? (
           <button
             aria-label={isCollapsed ? `Expand ${node.title}` : `Collapse ${node.title}`}
-            className="icon-action note-folder-overview__toggle"
+            className="folder-toggle"
             onClick={() => onToggleFolder(node.id)}
             title={isCollapsed ? `Expand ${node.title}` : `Collapse ${node.title}`}
             type="button"
@@ -548,19 +686,28 @@ function BookmarkOverviewTreeNode({
             {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
           </button>
         ) : (
-          <span aria-hidden="true" className="note-folder-overview__toggle-spacer" />
+          <span aria-hidden="true" className="folder-toggle folder-toggle--spacer" />
         )}
-        <button
-          className={`note-folder-overview__folder-button ${activeFolderId === node.id ? "is-active" : ""}`.trim()}
+        <span
+          className="tree-folder__label note-tree-folder__label"
           onClick={() => onSelect(node.id)}
-          type="button"
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onSelect(node.id);
+            }
+          }}
+          role="button"
+          tabIndex={0}
         >
-          <Folder size={14} />
-          <span>{node.title} ({countBookmarksInNodes(node.children)})</span>
-        </button>
+          <Folder size={16} />
+          <span>
+            {node.title} <span className="tree-folder__count">({countBookmarksInNodes(node.children)})</span>
+          </span>
+        </span>
       </div>
       {childFolders.length > 0 && !isCollapsed ? (
-        <div className="note-folder-overview__tree-children">
+        <div className="tree-folder__children">
           {childFolders.map((child) => (
             <BookmarkOverviewTreeNode
               activeFolderId={activeFolderId}
@@ -754,6 +901,20 @@ function normalizeBookmarkMenuRoots(nodes: BookmarkNode[]) {
   }
 
   return normalized;
+}
+
+function areSetsEqual(left: Set<string>, right: Set<string>) {
+  if (left.size !== right.size) {
+    return false;
+  }
+
+  for (const value of left) {
+    if (!right.has(value)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function orderSubmenuNodes(nodes: BookmarkNode[]) {

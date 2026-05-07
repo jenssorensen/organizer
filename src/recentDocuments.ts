@@ -118,6 +118,19 @@ export function removeRecentDocumentById(entries: RecentDocumentEntry[], entryId
   return entries.filter((entry) => entry.id !== entryId);
 }
 
+export function getRecentDocumentViewKey(
+  seed: Omit<RecentDocumentEntry, "id" | "pinned" | "viewedAt" | "viewCount" | "lastEditedAt" | "lastCompletedAt">,
+) {
+  return [
+    seed.documentId,
+    seed.kind,
+    seed.snapshot.section,
+    seed.snapshot.selectedNoteNodeId ?? "",
+    seed.snapshot.selectedBookmarkId ?? "",
+    seed.snapshot.selectedTodoId ?? "",
+  ].join("::");
+}
+
 export function recordRecentDocumentView(
   current: RecentDocumentEntry[],
   seed: Omit<RecentDocumentEntry, "id" | "pinned" | "viewedAt" | "viewCount" | "lastEditedAt" | "lastCompletedAt">,
