@@ -215,16 +215,6 @@ export type NotesResponse = {
   additionalFolders: string[];
 };
 
-export type DocsUploadResponse = {
-  targetPath: string;
-  uploaded: Array<{
-    fileName: string;
-    sourcePath: string;
-    indexed: boolean;
-  }>;
-  indexedCount: number;
-};
-
 export type DocsCreateResponse = {
   targetPath: string;
   fileName: string;
@@ -251,7 +241,7 @@ export type UnfurlResponse = {
   siteName: string;
 };
 
-export type NoteUploadTarget = {
+export type NoteCreationTarget = {
   sourcePath: string;
   label: string;
 };

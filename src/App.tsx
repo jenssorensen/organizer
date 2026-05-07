@@ -68,15 +68,14 @@ import type {
   BookmarkLeaf,
   BookmarkNode,
   DocsRenameResponse,
-  DocsUploadResponse,
   ImportResponse,
   NavItem,
   Note,
+  NoteCreationTarget,
   NoteCreationDialogState,
   NoteFolderNode,
   NoteLeafNode,
   NoteTreeNode,
-  NoteUploadTarget,
   QuickCaptureState,
   RecentDocumentEntry,
   RecentDocumentSeed,
@@ -667,7 +666,6 @@ function App() {
   }, [sidebarApiBase]);
 
   const bookmarkImportInputRef = useRef<HTMLInputElement>(null);
-  const noteUploadInputRef = useRef<HTMLInputElement>(null);
   const topbarSearchInputRef = useRef<HTMLInputElement>(null);
   const searchDialogInputRef = useRef<HTMLInputElement>(null);
   const [todoListSplitMode, setTodoListSplitMode] = useState<"side-by-side" | "stacked">(getStoredTodoListSplitMode);
@@ -1515,8 +1513,8 @@ function App() {
     };
   }, [handleSyncAll, refreshPendingSyncCount]);
 
-  const noteUploadTarget = useMemo(
-    () => getNoteUploadTarget(section, selectedNoteTreeNode, selectedNote),
+  const noteCreationTarget = useMemo(
+    () => getNoteCreationTarget(section, selectedNoteTreeNode, selectedNote),
     [section, selectedNote, selectedNoteTreeNode],
   );
   const canGoBack = navigationHistory.index > 0;
@@ -2367,6 +2365,62 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       nodeLabel={currentFolderContextNode?.title ?? null}
       rootLabel={isMultiRoot ? null : docsFolder}
       notesNavigationMode={section === "notes" ? notesNavigationMode : "folder"}
+      sectionsHeaderLeading={section === "notes" ? (
+        <div aria-label="Navigation mode" className="note-folder-overview__segmented" role="radiogroup">
+          <button
+            aria-checked={notesNavigationMode === "folder"}
+            className={`note-folder-overview__segmented-btn ${notesNavigationMode === "folder" ? "is-active" : ""}`}
+            onClick={() => setNotesNavigationMode("folder")}
+            role="radio"
+            title="Show folder navigation"
+            type="button"
+          >
+            <FolderTree size={14} />
+            <span className="note-folder-overview__segmented-label">Folder</span>
+          </button>
+          <button
+            aria-checked={notesNavigationMode === "section"}
+            className={`note-folder-overview__segmented-btn ${notesNavigationMode === "section" ? "is-active" : ""}`}
+            onClick={() => setNotesNavigationMode("section")}
+            role="radio"
+            title="Show section navigation"
+            type="button"
+          >
+            <LayoutList size={14} />
+            <span className="note-folder-overview__segmented-label">Section</span>
+          </button>
+        </div>
+      ) : null}
+      navigationHeaderActions={section === "notes" && noteCreationTarget ? (
+        <button
+          aria-label="Create document"
+          className="mini-action is-active note-folder-overview__header-action note-folder-overview__header-action--adaptive"
+          onClick={handleCreateDocument}
+          title={`Create in ${noteCreationTarget.label}`}
+          type="button"
+        >
+          <FilePlus2 size={14} />
+          <span className="note-folder-overview__header-action-label note-folder-overview__header-action-label--adaptive">New Document</span>
+        </button>
+      ) : null}
+      sectionsHeaderActions={section === "notes" ? (
+        <button
+          className="mini-action is-active note-folder-overview__header-action note-folder-overview__header-action--adaptive"
+          onClick={notesNavigationMode === "section" ? handleCreateSection : handleCreateFolder}
+          title={notesNavigationMode === "section"
+            ? "Create section in data/docs"
+            : noteCreationTarget
+              ? `Create folder in ${noteCreationTarget.label}`
+              : "Create folder"
+          }
+          type="button"
+        >
+          <FolderPlus size={14} />
+          <span className="note-folder-overview__header-action-label note-folder-overview__header-action-label--adaptive">
+            {notesNavigationMode === "section" ? "New Section" : "New Folder"}
+          </span>
+        </button>
+      ) : null}
       draggedNoteSourcePath={section === "notes" ? draggedNoteSourcePath : null}
       onMoveNote={section === "notes" ? handleMoveNote : undefined}
       onNoteDragEnd={section === "notes" ? () => {
@@ -2913,10 +2967,6 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
     }
   }
 
-  function openNoteUploadDialog() {
-    noteUploadInputRef.current?.click();
-  }
-
   async function handleSetDocsSource(folderPath?: string) {
     const trimmed = (folderPath ?? docsSourceInput).trim();
     if (!trimmed) {
@@ -2992,27 +3042,27 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
   }
 
   async function handleCreateDocument() {
-    if (section !== "notes" || !noteUploadTarget) {
+    if (section !== "notes" || !noteCreationTarget) {
       return;
     }
     setNoteCreationDialog({
-      creationPath: noteUploadTarget.sourcePath,
+      creationPath: noteCreationTarget.sourcePath,
       kind: "document",
       name: "",
-      targetPath: formatNoteTargetLocation(noteUploadTarget.sourcePath),
+      targetPath: formatNoteTargetLocation(noteCreationTarget.sourcePath),
       selectedTemplate: "blank",
     });
   }
 
   async function handleCreateFolder() {
-    if (section !== "notes" || !noteUploadTarget) {
+    if (section !== "notes" || !noteCreationTarget) {
       return;
     }
     setNoteCreationDialog({
-      creationPath: noteUploadTarget.sourcePath,
+      creationPath: noteCreationTarget.sourcePath,
       kind: "folder",
       name: "",
-      targetPath: formatNoteTargetLocation(noteUploadTarget.sourcePath),
+      targetPath: formatNoteTargetLocation(noteCreationTarget.sourcePath),
     });
   }
 
@@ -3099,58 +3149,12 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
     navigateNoteSelection(targetFolderId, "notes");
   }
 
-  async function handleNoteUpload(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
-    if (files.length === 0 || !noteUploadTarget) {
-      event.target.value = "";
-      return;
-    }
-
-    const targetLabel = noteUploadTarget.label;
-    setNotesStatus(`Uploading ${files.length} file${files.length === 1 ? "" : "s"} to ${targetLabel}...`);
-
-    try {
-      const uploadFiles = await Promise.all(
-        files.map(async (file) => ({
-          name: file.name,
-          contentBase64: await readFileAsBase64(file),
-        })),
-      );
-
-      const response = await fetch(`${sidebarApiBase}/api/docs/upload`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetPath: noteUploadTarget.sourcePath,
-          files: uploadFiles,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to upload files");
-      }
-
-      const result = (await response.json()) as DocsUploadResponse;
-      await loadNotes();
-      setNotesStatus(
-        `Uploaded ${result.uploaded.length} file${result.uploaded.length === 1 ? "" : "s"} to ${targetLabel}. ${
-          result.indexedCount
-        } markdown file${result.indexedCount === 1 ? "" : "s"} indexed.`,
-      );
-      navigate({ section: "notes" }, "replace");
-    } catch {
-      setNotesStatus("Upload failed");
-    } finally {
-      event.target.value = "";
-    }
-  }
-
   async function handleOpenCurrentNotesFolder() {
     try {
       const targetSourcePath =
         (selectedNote?.sourcePath ? getParentSourcePath(selectedNote.sourcePath) : null) ??
         currentFolderContextNode?.sourcePath ??
-        noteUploadTarget?.sourcePath ??
+        noteCreationTarget?.sourcePath ??
         "";
       const folderPath = await resolveAbsoluteNotesFolderPath(targetSourcePath);
 
@@ -4124,7 +4128,6 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
           accept=".html,text/html"
           onChange={handleBookmarkImport}
         />
-        <input ref={noteUploadInputRef} className="hidden-input" type="file" multiple onChange={handleNoteUpload} />
         {shouldUseManualPaths ? (
           <p className="sidebar__folder-path-note">
             Windows browser build: enter note and metadata paths manually. Additional note-folder import is unavailable.
@@ -4594,7 +4597,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                         : viewerContent.title}
                   </h3>
                   {section === "notes" || section === "wiki" ? (
-                    <div className="hero-card__header-subcopy notes-actions__target-text">
+                    <div className="hero-card__header-subcopy hero-card__header-subcopy--notes">
                         <button
                           aria-label="Open folder in file manager"
                           className="hero-card__folder-button"
@@ -4609,8 +4612,8 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                       <span>
                         {section === "notes" && notesNavigationMode === "section" && activeNoteSection
                           ? `Section: ${activeNoteSection.title}`
-                          : section === "notes" && noteUploadTarget
-                            ? `Target: ${noteUploadTarget.label}`
+                          : section === "notes" && noteCreationTarget
+                            ? `Target: ${noteCreationTarget.label}`
                             : query.trim()
                               ? "Filtered by search"
                               : "Focus view"}
@@ -4618,7 +4621,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                     </div>
                   ) : null}
                   {section === "todo" && todoStoragePath ? (
-                    <div className="hero-card__header-subcopy notes-actions__target-text">
+                    <div className="hero-card__header-subcopy hero-card__header-subcopy--notes">
                       <button
                         className="todo-storage-path-button"
                         onClick={() => {
@@ -4692,77 +4695,6 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                     <Plus size={14} />
                     Bookmark
                   </button>
-                </div>
-              ) : section === "notes" || section === "wiki" ? (
-                <div className="notes-actions">
-                  <div className="inline-actions">
-                    {section === "notes" ? (
-                      notesNavigationMode === "section" ? (
-                        <button
-                          className="mini-action notes-actions__button notes-actions__button--view"
-                          onClick={() => setNotesNavigationMode("folder")}
-                          type="button"
-                        >
-                          <FolderTree size={14} />
-                          <span className="notes-actions__label">Folder View</span>
-                        </button>
-                      ) : (
-                        <button
-                          className="mini-action notes-actions__button notes-actions__button--view"
-                          onClick={() => setNotesNavigationMode("section")}
-                          type="button"
-                        >
-                          <LayoutList size={14} />
-                          <span className="notes-actions__label">Section View</span>
-                        </button>
-                      )
-                    ) : null}
-                    {section === "notes" ? (
-                      <button
-                        className="mini-action notes-actions__button notes-actions__button--section"
-                        disabled={notesNavigationMode !== "section"}
-                        onClick={handleCreateSection}
-                        title={notesNavigationMode === "section" ? "Create section in data/docs" : "Switch to Section View to create a section"}
-                        type="button"
-                      >
-                        <FolderPlus size={14} />
-                        <span className="notes-actions__label">New Section</span>
-                      </button>
-                    ) : null}
-                    {section === "notes" && noteUploadTarget ? (
-                      <button
-                        className="mini-action notes-actions__button notes-actions__button--document"
-                        onClick={handleCreateDocument}
-                        title={`Create in ${noteUploadTarget.label}`}
-                        type="button"
-                      >
-                        <FilePlus2 size={14} />
-                        <span className="notes-actions__label">New Document</span>
-                      </button>
-                    ) : null}
-                    {section === "notes" && noteUploadTarget ? (
-                      <button
-                        className="mini-action notes-actions__button notes-actions__button--folder"
-                        onClick={handleCreateFolder}
-                        title={`Create folder in ${noteUploadTarget.label}`}
-                        type="button"
-                      >
-                        <FolderPlus size={14} />
-                        <span className="notes-actions__label">New Folder</span>
-                      </button>
-                    ) : null}
-                    {section === "notes" && noteUploadTarget ? (
-                      <button
-                        className="mini-action notes-actions__button notes-actions__button--upload"
-                        onClick={openNoteUploadDialog}
-                        title={`Upload into ${noteUploadTarget.label}`}
-                        type="button"
-                      >
-                        <FilePlus2 size={14} />
-                        <span className="notes-actions__label">Upload</span>
-                      </button>
-                    ) : null}
-                  </div>
                 </div>
               ) : section === "recent" ? (
                 <div className="recent-actions">
@@ -5944,11 +5876,11 @@ function getNoteTreeTrail(tree: NoteTreeNode[], targetId: string, trail: NoteTre
   return [];
 }
 
-function getNoteUploadTarget(
+function getNoteCreationTarget(
   section: SectionId,
   selectedNode: NoteTreeNode | null,
   selectedNote: Note | null,
-): NoteUploadTarget | null {
+): NoteCreationTarget | null {
   if (section !== "notes") {
     return null;
   }
@@ -6022,28 +5954,6 @@ function getPathBasename(value: string) {
   const normalized = value.replace(/[\\/]+$/g, "");
   const segments = normalized.split(/[\\/]/).filter(Boolean);
   return segments.at(-1) ?? "";
-}
-
-function readFileAsBase64(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== "string") {
-        reject(new Error("Unable to read file"));
-        return;
-      }
-
-      resolve(result.slice(result.indexOf(",") + 1));
-    };
-
-    reader.onerror = () => {
-      reject(reader.error ?? new Error("Unable to read file"));
-    };
-
-    reader.readAsDataURL(file);
-  });
 }
 
 function createRecentDocumentSeed(note: Note, snapshot: NavigationSnapshot): RecentDocumentSeed {

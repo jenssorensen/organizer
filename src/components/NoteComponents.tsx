@@ -948,9 +948,12 @@ function NoteFolderOverviewPanel({
   onToggleFolder,
   previewContentScale = 100,
   previewSupplementary,
+  navigationHeaderActions,
   previewToolbarActions,
   previewToolbarLeading,
   sections,
+  sectionsHeaderActions,
+  sectionsHeaderLeading,
   selectedNote,
   selectedNodeId,
   showContextPill = true,
@@ -989,11 +992,14 @@ function NoteFolderOverviewPanel({
   onTogglePinnedNote?: (noteId: string, nextPinned: boolean) => void;
   onToggleNoteStar: (note: Note, nextStarred: boolean) => void;
   onToggleFolder: (folderId: string) => void;
+  navigationHeaderActions?: ReactNode;
   previewContentScale?: number;
   previewSupplementary?: ReactNode;
   previewToolbarActions?: ReactNode;
   previewToolbarLeading?: ReactNode;
   sections: NoteSectionSummary[];
+  sectionsHeaderActions?: ReactNode;
+  sectionsHeaderLeading?: ReactNode;
   selectedNote: Note | null;
   selectedNodeId: string | null;
   showContextPill?: boolean;
@@ -1011,7 +1017,6 @@ function NoteFolderOverviewPanel({
   const [folderNotesSortMode, setFolderNotesSortMode] = useState<FolderNotesSortMode>(getStoredFolderNotesSortMode);
   const [isFolderNotesSortMenuOpen, setIsFolderNotesSortMenuOpen] = useState(false);
   const [noteRowViewMode, setNoteRowViewMode] = useState<NoteRowViewMode>(getStoredNoteRowViewMode);
-  const [isNavigationViewMenuOpen, setIsNavigationViewMenuOpen] = useState(false);
   const [isFolderNotesViewMenuOpen, setIsFolderNotesViewMenuOpen] = useState(false);
 
   // Stable sort: snapshot activity metrics so the tree doesn't re-sort while the user browses.
@@ -1054,7 +1059,6 @@ function NoteFolderOverviewPanel({
   const sectionsSortMenuRef = useRef<HTMLDivElement | null>(null);
   const navigationSortMenuRef = useRef<HTMLDivElement | null>(null);
   const folderNotesSortMenuRef = useRef<HTMLDivElement | null>(null);
-  const navigationViewMenuRef = useRef<HTMLDivElement | null>(null);
   const folderNotesViewMenuRef = useRef<HTMLDivElement | null>(null);
   const overviewSplitRestoreRef = useRef(overviewSplitPercent);
 
@@ -1125,8 +1129,19 @@ function NoteFolderOverviewPanel({
   const hasMoreChildNotes = visibleChildCount < sortedChildNotes.length;
   const capitalizedItemLabelPlural = `${itemLabelPlural.slice(0, 1).toUpperCase()}${itemLabelPlural.slice(1)}`;
   const rootNodeLabel = rootLabel || `All ${itemLabelPlural}`;
-  const directItemsHeading = `${capitalizedItemLabelPlural} in this folder`;
-  const directItemsEmptyText = `No ${itemLabelPlural} directly in this folder.`;
+  const directItemsHeading = notesNavigationMode === "section"
+    ? `${capitalizedItemLabelPlural} in this section`
+    : `${capitalizedItemLabelPlural} in this folder`;
+  const directItemsEmptyText = notesNavigationMode === "section"
+    ? `No ${itemLabelPlural} or subfolders in this section yet.`
+    : `No ${itemLabelPlural} directly in this folder.`;
+  const sectionsHeaderEyebrow = "Organize structure";
+  const navigationScopeLabel = notesNavigationMode === "section" || effectiveActiveSection || activeSection
+    ? `${capitalizedItemLabelPlural} in this section`
+    : `${capitalizedItemLabelPlural} in this folder`;
+  const showNavigationModeInSectionsHeader = hasSections && !isSectionsCollapsed;
+  const showNavigationModeInNavigationHeader = !showNavigationModeInSectionsHeader;
+  const navigationHeaderTitle = effectiveActiveSection?.title ?? activeSection?.title ?? nodeLabel ?? rootNodeLabel;
   const sectionsSortLabel = "Sort sections";
   const navigationSortLabel = "Sort section navigation";
   const sortItemsLabel = `Sort ${itemLabelPlural} in this folder`;
@@ -1134,6 +1149,8 @@ function NoteFolderOverviewPanel({
   const activeNavigationSortOption = NAVIGATION_SORT_OPTIONS.find((option) => option.value === navigationSortMode) ?? NAVIGATION_SORT_OPTIONS[0];
   const activeFolderNotesSortOption = FOLDER_NOTES_SORT_OPTIONS.find((option) => option.value === folderNotesSortMode) ?? FOLDER_NOTES_SORT_OPTIONS[2];
   const activeNoteRowViewOption = NOTE_ROW_VIEW_OPTIONS.find((option) => option.value === noteRowViewMode) ?? NOTE_ROW_VIEW_OPTIONS[0];
+  const isSectionView = notesNavigationMode === "section";
+  const isOverviewPaneCollapsed = isTreeCollapsed && isNotesCollapsed;
 
   useEffect(() => {
     window.localStorage.setItem(STORED_NOTES_PREVIEW_SPLIT_KEY, String(previewSplitPercent));
@@ -1174,10 +1191,10 @@ function NoteFolderOverviewPanel({
   }, [isTreeCollapsed, overviewSplitPercent]);
 
   useEffect(() => {
-    if (!isNotesCollapsed) {
+    if (!isOverviewPaneCollapsed) {
       previewSplitRestoreRef.current = previewSplitPercent;
     }
-  }, [isNotesCollapsed, previewSplitPercent]);
+  }, [isOverviewPaneCollapsed, previewSplitPercent]);
 
   useEffect(() => {
     window.localStorage.setItem(STORED_NOTES_OVERVIEW_SPLIT_KEY, String(overviewSplitPercent));
@@ -1222,11 +1239,11 @@ function NoteFolderOverviewPanel({
   }, [hasSections, notesNavigationMode]);
 
   useEffect(() => {
-    const previewBoundsWidth = notesNavigationMode === "section"
+    const previewBoundsWidth = isSectionView
       ? splitRef.current?.getBoundingClientRect().width ?? 0
       : previewSplitRef.current?.getBoundingClientRect().width ?? 0;
     setPreviewSplitPercent((current) => clampPaneSplitPercentForBounds(current, previewBoundsWidth, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
-  }, [notesNavigationMode]);
+  }, [isSectionView]);
 
   useEffect(() => {
     if (sectionCustomizationSectionId && !sectionBeingCustomized) {
@@ -1331,34 +1348,6 @@ function NoteFolderOverviewPanel({
   }, [isFolderNotesSortMenuOpen]);
 
   useEffect(() => {
-    if (!isNavigationViewMenuOpen) {
-      return;
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      if (navigationViewMenuRef.current?.contains(event.target as Node)) {
-        return;
-      }
-
-      setIsNavigationViewMenuOpen(false);
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsNavigationViewMenuOpen(false);
-      }
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isNavigationViewMenuOpen]);
-
-  useEffect(() => {
     if (!isFolderNotesViewMenuOpen) {
       return;
     }
@@ -1437,8 +1426,9 @@ function NoteFolderOverviewPanel({
       const minimumOverviewPercent = getMinimumPaneSplitPercent(bounds.width, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52);
 
       if (nextPercent < minimumOverviewPercent * 0.6) {
-        if (notesNavigationMode === "section") {
+        if (isSectionView) {
           previewSplitRestoreRef.current = previewSplitPercent;
+          setIsNotesCollapsed(true);
         } else {
           overviewSplitRestoreRef.current = overviewSplitPercent;
         }
@@ -1447,7 +1437,7 @@ function NoteFolderOverviewPanel({
         return;
       }
 
-      if (notesNavigationMode === "section") {
+      if (isSectionView) {
         setPreviewSplitPercent(clampPaneSplitPercentForBounds(nextPercent, bounds.width, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
         return;
       }
@@ -1466,7 +1456,7 @@ function NoteFolderOverviewPanel({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [isResizingOverview, notesNavigationMode, overviewSplitPercent, previewSplitPercent]);
+  }, [isResizingOverview, isSectionView, overviewSplitPercent, previewSplitPercent]);
 
   useEffect(() => {
     if (!isResizingPreview) {
@@ -1536,23 +1526,23 @@ function NoteFolderOverviewPanel({
     if (event.key === "ArrowLeft") {
       event.preventDefault();
       const boundsWidth = splitRef.current?.getBoundingClientRect().width ?? 0;
-      if (notesNavigationMode === "section") {
-        setPreviewSplitPercent((current) => clampPaneSplitPercentForBounds(current - 3, boundsWidth, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
+      if (!isSectionView) {
+        setOverviewSplitPercent((current) => clampPaneSplitPercentForBounds(current - 3, boundsWidth, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
         return;
       }
 
-      setOverviewSplitPercent((current) => clampPaneSplitPercentForBounds(current - 3, boundsWidth, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
+      setPreviewSplitPercent((current) => clampPaneSplitPercentForBounds(current - 3, boundsWidth, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
     }
 
     if (event.key === "ArrowRight") {
       event.preventDefault();
       const boundsWidth = splitRef.current?.getBoundingClientRect().width ?? 0;
-      if (notesNavigationMode === "section") {
-        setPreviewSplitPercent((current) => clampPaneSplitPercentForBounds(current + 3, boundsWidth, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
+      if (!isSectionView) {
+        setOverviewSplitPercent((current) => clampPaneSplitPercentForBounds(current + 3, boundsWidth, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
         return;
       }
 
-      setOverviewSplitPercent((current) => clampPaneSplitPercentForBounds(current + 3, boundsWidth, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
+      setPreviewSplitPercent((current) => clampPaneSplitPercentForBounds(current + 3, boundsWidth, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
     }
   }
 
@@ -1619,19 +1609,20 @@ function NoteFolderOverviewPanel({
 
   function toggleTreeCollapsed() {
     if (isTreeCollapsed) {
-      const boundsWidth = splitRef.current?.getBoundingClientRect().width ?? 0;
-      if (notesNavigationMode === "section") {
+      if (isSectionView && isOverviewPaneCollapsed) {
+        const boundsWidth = splitRef.current?.getBoundingClientRect().width ?? 0;
         setPreviewSplitPercent(clampPaneSplitPercentForBounds(previewSplitRestoreRef.current, boundsWidth, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
-      } else {
+      } else if (!isSectionView) {
+        const boundsWidth = splitRef.current?.getBoundingClientRect().width ?? 0;
         setOverviewSplitPercent(clampPaneSplitPercentForBounds(overviewSplitRestoreRef.current, boundsWidth, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
       }
       setIsTreeCollapsed(false);
       return;
     }
 
-    if (notesNavigationMode === "section") {
+    if (isSectionView && isNotesCollapsed) {
       previewSplitRestoreRef.current = previewSplitPercent;
-    } else {
+    } else if (!isSectionView) {
       overviewSplitRestoreRef.current = overviewSplitPercent;
     }
     setIsTreeCollapsed(true);
@@ -1639,13 +1630,17 @@ function NoteFolderOverviewPanel({
 
   function toggleNotesCollapsed() {
     if (isNotesCollapsed) {
-      const boundsWidth = previewSplitRef.current?.getBoundingClientRect().width ?? 0;
-      setPreviewSplitPercent(clampPaneSplitPercentForBounds(previewSplitRestoreRef.current, boundsWidth, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
+      if (isOverviewPaneCollapsed) {
+        const boundsWidth = splitRef.current?.getBoundingClientRect().width ?? 0;
+        setPreviewSplitPercent(clampPaneSplitPercentForBounds(previewSplitRestoreRef.current, boundsWidth, MIN_NOTE_TREE_MAIN_WIDTH, 11, 52));
+      }
       setIsNotesCollapsed(false);
       return;
     }
 
-    previewSplitRestoreRef.current = previewSplitPercent;
+    if (isTreeCollapsed) {
+      previewSplitRestoreRef.current = previewSplitPercent;
+    }
     setIsNotesCollapsed(true);
   }
 
@@ -1674,7 +1669,7 @@ function NoteFolderOverviewPanel({
         </>
       ) : (
         <>
-          <div className="note-folder-overview__section-header">
+          <div className="note-folder-overview__section-toolbar">
             <h4>Preview</h4>
           </div>
           <div className="note-folder-overview__no-preview">
@@ -1723,7 +1718,7 @@ function NoteFolderOverviewPanel({
       >
         {hasSections ? (
           <section className={`note-folder-overview__section note-folder-overview__section--sections ${isSectionsCollapsed ? "is-collapsed" : ""}`}>
-            <div className="note-folder-overview__section-header">
+            <div className="note-folder-overview__section-toolbar">
               <div className="note-folder-overview__section-heading">
                 <button
                   aria-label={isSectionsCollapsed ? "Expand sections pane" : "Collapse sections pane"}
@@ -1734,41 +1729,56 @@ function NoteFolderOverviewPanel({
                 >
                   {isSectionsCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
                 </button>
-                {!isSectionsCollapsed ? <h4>Sections</h4> : null}
+                {!isSectionsCollapsed ? (
+                  <div className="note-folder-overview__header-intro">
+                    <p className="note-folder-overview__header-eyebrow">{sectionsHeaderEyebrow}</p>
+                    <h4>Sections</h4>
+                  </div>
+                ) : null}
               </div>
               {!isSectionsCollapsed ? (
-                <div className="note-folder-overview__sort-menu" ref={sectionsSortMenuRef}>
-                  <button
-                    aria-expanded={isSectionsSortMenuOpen}
-                    aria-haspopup="menu"
-                    aria-label={`${sectionsSortLabel}: ${activeSectionsSortOption.label}`}
-                    className="icon-action note-folder-overview__sort-trigger"
-                    onClick={() => setIsSectionsSortMenuOpen((current) => !current)}
-                    title={`${sectionsSortLabel}: ${activeSectionsSortOption.label}`}
-                    type="button"
-                  >
-                    <ArrowUpDown size={15} />
-                  </button>
-                  {isSectionsSortMenuOpen ? (
-                    <div aria-label={sectionsSortLabel} className="note-folder-overview__sort-popup" role="menu">
-                      {SECTIONS_SORT_OPTIONS.map((option) => (
-                        <button
-                          key={option.value}
-                          aria-checked={sectionsSortMode === option.value}
-                          className={`note-folder-overview__sort-option ${sectionsSortMode === option.value ? "is-active" : ""}`}
-                          onClick={() => {
-                            setSectionsSortMode(option.value);
-                            setIsSectionsSortMenuOpen(false);
-                          }}
-                          role="menuitemradio"
-                          type="button"
-                        >
-                          <span>{option.label}</span>
-                          {sectionsSortMode === option.value ? <Check size={14} /> : null}
-                        </button>
-                      ))}
-                    </div>
+                <div className="note-folder-overview__section-actions">
+                  {sectionsHeaderLeading && showNavigationModeInSectionsHeader ? (
+                    <div className="note-folder-overview__header-mode-actions">{sectionsHeaderLeading}</div>
                   ) : null}
+                  {sectionsHeaderActions ? (
+                    <div className="note-folder-overview__header-primary-actions">{sectionsHeaderActions}</div>
+                  ) : null}
+                  <div className="note-folder-overview__header-utility-actions">
+                    <div className="note-folder-overview__sort-menu" ref={sectionsSortMenuRef}>
+                      <button
+                        aria-expanded={isSectionsSortMenuOpen}
+                        aria-haspopup="menu"
+                        aria-label={`${sectionsSortLabel}: ${activeSectionsSortOption.label}`}
+                        className="icon-action note-folder-overview__sort-trigger"
+                        onClick={() => setIsSectionsSortMenuOpen((current) => !current)}
+                        title={`${sectionsSortLabel}: ${activeSectionsSortOption.label}`}
+                        type="button"
+                      >
+                        <ArrowUpDown size={15} />
+                      </button>
+                      {isSectionsSortMenuOpen ? (
+                        <div aria-label={sectionsSortLabel} className="note-folder-overview__sort-popup" role="menu">
+                          {SECTIONS_SORT_OPTIONS.map((option) => (
+                            <button
+                              key={option.value}
+                              aria-checked={sectionsSortMode === option.value}
+                              className={`note-folder-overview__sort-option ${sectionsSortMode === option.value ? "is-active" : ""}`}
+                              onClick={() => {
+                                setSectionsSortMode(option.value);
+                                setIsSectionsSortMenuOpen(false);
+                              }}
+                              role="menuitemradio"
+                              type="button"
+                            >
+                              <span>{option.label}</span>
+                              {sectionsSortMode === option.value ? <Check size={14} /> : null}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -1970,208 +1980,163 @@ function NoteFolderOverviewPanel({
           className={`note-folder-overview__split ${isResizingOverview ? "is-resizing" : ""}`}
           ref={splitRef}
           style={{
-            gridTemplateColumns: isTreeCollapsed
+            gridTemplateColumns: (isSectionView ? isOverviewPaneCollapsed : isTreeCollapsed)
               ? getCollapsedOverviewColumns()
-              : getResizableOverviewColumns(notesNavigationMode === "section" ? previewSplitPercent : overviewSplitPercent),
+              : getResizableOverviewColumns(isSectionView ? previewSplitPercent : overviewSplitPercent),
           }}
         >
-          <section className={`note-folder-overview__section note-folder-overview__section--tree ${isTreeCollapsed ? "is-collapsed" : ""}`}>
-            <div className="note-folder-overview__section-header">
-              <div className="note-folder-overview__section-heading">
-                <button
-                  aria-label={isTreeCollapsed ? "Expand navigation pane" : "Collapse navigation pane"}
-                  className="icon-action note-folder-overview__collapse-toggle"
-                  onClick={toggleTreeCollapsed}
-                  title={isTreeCollapsed ? "Expand navigation pane" : "Collapse navigation pane"}
-                  type="button"
-                >
-                  {isTreeCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-                </button>
-                {!isTreeCollapsed ? <h4>{notesNavigationMode === "section" ? "Section navigation" : activeSection ? "Section navigation" : "Child folders"}</h4> : null}
+          <section className={`note-folder-overview__section note-folder-overview__section--overview ${(isSectionView ? isOverviewPaneCollapsed : isTreeCollapsed) ? "is-collapsed" : ""}`}>
+            {!isSectionView ? (
+            <div className="note-folder-overview__overview-block note-folder-overview__overview-block--tree">
+              <div className="note-folder-overview__section-toolbar">
+                <div className="note-folder-overview__section-heading">
+                  <button
+                    aria-label={isTreeCollapsed ? "Expand navigation pane" : "Collapse navigation pane"}
+                    className="icon-action note-folder-overview__collapse-toggle"
+                    onClick={toggleTreeCollapsed}
+                    title={isTreeCollapsed ? "Expand navigation pane" : "Collapse navigation pane"}
+                    type="button"
+                  >
+                    {isTreeCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+                  </button>
+                  {!isTreeCollapsed ? (
+                    <div className="note-folder-overview__header-intro">
+                      <p className="note-folder-overview__header-eyebrow">{navigationScopeLabel}</p>
+                      <h4>{navigationHeaderTitle}</h4>
+                    </div>
+                  ) : null}
+                </div>
+                {!isTreeCollapsed ? (
+                  <div className="note-folder-overview__section-actions">
+                    {sectionsHeaderLeading && showNavigationModeInNavigationHeader ? (
+                      <div className="note-folder-overview__header-mode-actions">{sectionsHeaderLeading}</div>
+                    ) : null}
+                    {navigationHeaderActions ? (
+                      <div className="note-folder-overview__header-primary-actions">{navigationHeaderActions}</div>
+                    ) : null}
+                    <div className="note-folder-overview__header-utility-actions">
+                      <div className="note-folder-overview__sort-menu" ref={navigationSortMenuRef}>
+                        <button
+                          aria-expanded={isNavigationSortMenuOpen}
+                          aria-haspopup="menu"
+                          aria-label={`${navigationSortLabel}: ${activeNavigationSortOption.label}`}
+                          className="icon-action note-folder-overview__sort-trigger"
+                          onClick={() => setIsNavigationSortMenuOpen((current) => !current)}
+                          title={`${navigationSortLabel}: ${activeNavigationSortOption.label}`}
+                          type="button"
+                        >
+                          <ArrowUpDown size={15} />
+                        </button>
+                        {isNavigationSortMenuOpen ? (
+                          <div aria-label={navigationSortLabel} className="note-folder-overview__sort-popup" role="menu">
+                            {NAVIGATION_SORT_OPTIONS.map((option) => (
+                              <button
+                                key={option.value}
+                                aria-checked={navigationSortMode === option.value}
+                                className={`note-folder-overview__sort-option ${navigationSortMode === option.value ? "is-active" : ""}`}
+                                onClick={() => {
+                                  setNavigationSortMode(option.value);
+                                  setIsNavigationSortMenuOpen(false);
+                                }}
+                                role="menuitemradio"
+                                type="button"
+                              >
+                                <span>{option.label}</span>
+                                {navigationSortMode === option.value ? <Check size={14} /> : null}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
               {!isTreeCollapsed ? (
-                <div className="note-folder-overview__section-actions">
-                  <div className="note-folder-overview__sort-menu" ref={navigationSortMenuRef}>
-                    <button
-                      aria-expanded={isNavigationSortMenuOpen}
-                      aria-haspopup="menu"
-                      aria-label={`${navigationSortLabel}: ${activeNavigationSortOption.label}`}
-                      className="icon-action note-folder-overview__sort-trigger"
-                      onClick={() => setIsNavigationSortMenuOpen((current) => !current)}
-                      title={`${navigationSortLabel}: ${activeNavigationSortOption.label}`}
-                      type="button"
-                    >
-                      <ArrowUpDown size={15} />
-                    </button>
-                    {isNavigationSortMenuOpen ? (
-                      <div aria-label={navigationSortLabel} className="note-folder-overview__sort-popup" role="menu">
-                        {NAVIGATION_SORT_OPTIONS.map((option) => (
-                          <button
-                            key={option.value}
-                            aria-checked={navigationSortMode === option.value}
-                            className={`note-folder-overview__sort-option ${navigationSortMode === option.value ? "is-active" : ""}`}
-                            onClick={() => {
-                              setNavigationSortMode(option.value);
-                              setIsNavigationSortMenuOpen(false);
-                            }}
-                            role="menuitemradio"
-                            type="button"
-                          >
-                            <span>{option.label}</span>
-                            {navigationSortMode === option.value ? <Check size={14} /> : null}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="note-folder-overview__sort-menu" ref={navigationViewMenuRef}>
-                    <button
-                      aria-expanded={isNavigationViewMenuOpen}
-                      aria-haspopup="menu"
-                      aria-label={`Change note row view: ${activeNoteRowViewOption.label}`}
-                      className="note-folder-overview__view-trigger"
-                      onClick={() => setIsNavigationViewMenuOpen((current) => !current)}
-                      title={`Change note row view: ${activeNoteRowViewOption.label}`}
-                      type="button"
-                    >
-                      View
-                    </button>
-                    {isNavigationViewMenuOpen ? (
-                      <div aria-label="Change note row view" className="note-folder-overview__sort-popup" role="menu">
-                        {NOTE_ROW_VIEW_OPTIONS.map((option) => (
-                          <button
-                            key={option.value}
-                            aria-checked={noteRowViewMode === option.value}
-                            className={`note-folder-overview__sort-option ${noteRowViewMode === option.value ? "is-active" : ""}`}
-                            onClick={() => {
-                              setNoteRowViewMode(option.value);
-                              setIsNavigationViewMenuOpen(false);
-                            }}
-                            role="menuitemradio"
-                            title={option.description}
-                            type="button"
-                          >
-                            <span>{option.label}</span>
-                            {noteRowViewMode === option.value ? <Check size={14} /> : null}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            {!isTreeCollapsed ? (
-              <div className="note-folder-overview__tree">
-                {notesNavigationMode !== "section" ? (
-                  <div className={`tree-folder note-tree-folder ${effectiveActiveSection ? (isNoteDragActive || selectedNodeId === effectiveActiveSection.id) ? "is-selected" : "" : isRoot ? "is-selected" : ""}`}>
-                    <div className="tree-folder__title">
-                      <span
-                        className="tree-folder__label note-tree-folder__label"
-                        onClick={() => {
-                          if (effectiveActiveSection) {
-                            onSelectSection(effectiveActiveSection.id);
-                            return;
-                          }
-
-                          onSelectFolder(null);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
+                <div className="note-folder-overview__tree">
+                  {notesNavigationMode !== "section" ? (
+                    <div className={`tree-folder note-tree-folder ${effectiveActiveSection ? (isNoteDragActive || selectedNodeId === effectiveActiveSection.id) ? "is-selected" : "" : isRoot ? "is-selected" : ""}`}>
+                      <div className="tree-folder__title">
+                        <span
+                          className="tree-folder__label note-tree-folder__label"
+                          onClick={() => {
                             if (effectiveActiveSection) {
                               onSelectSection(effectiveActiveSection.id);
                               return;
                             }
 
                             onSelectFolder(null);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                      >
-                        <span aria-hidden="true" className="folder-toggle folder-toggle--spacer" />
-                        <Folder size={16} />
-                        <span>
-                          {effectiveActiveSection ? effectiveActiveSection.title : rootNodeLabel}{" "}
-                          <span className="tree-folder__count">({effectiveActiveSection ? effectiveActiveSection.noteCount : countNotesInTree(sortedNavigationTreeNodes)})</span>
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              if (effectiveActiveSection) {
+                                onSelectSection(effectiveActiveSection.id);
+                                return;
+                              }
+
+                              onSelectFolder(null);
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
+                        >
+                          <span aria-hidden="true" className="folder-toggle folder-toggle--spacer" />
+                          <Folder size={16} />
+                          <span>
+                            {effectiveActiveSection ? effectiveActiveSection.title : rootNodeLabel}{" "}
+                            <span className="tree-folder__count">({effectiveActiveSection ? effectiveActiveSection.noteCount : countNotesInTree(sortedNavigationTreeNodes)})</span>
+                          </span>
                         </span>
-                      </span>
+                      </div>
                     </div>
-                  </div>
-                ) : null}
-                {sortedNavigationTreeNodes.length > 0 ? (
-                  <div className="tree-folder__children">
-                    {visibleNavigationTreeNodes.map((folderNode, index) => (
-                      <NoteTreeItem
-                        expandedFolderIds={expandedFolderIds}
-                        foldersOnly={notesNavigationMode === "folder"}
-                        key={`${folderNode.id}:${index}`}
-                        node={folderNode}
-                        notes={allNotes}
-                        noteViewCounts={noteViewCounts}
-                        onNoteDragEnd={onNoteDragEnd}
-                        onNoteDragStart={onNoteDragStart}
-                        onNoteDrop={onMoveNote}
-                        pinnedNoteIds={pinnedNoteIds}
-                        onOpenHistory={onOpenNoteHistory}
-                        onRenameFile={onRenameNote}
-                        onSelect={onSelectNote}
-                        onTogglePinned={onTogglePinnedNote}
-                        onToggleStar={onToggleNoteStar}
-                        onToggleFolder={onToggleFolder}
-                        searchStateByNodeId={new Map()}
-                        selectedNodeId={isNoteDragActive && effectiveActiveSection ? effectiveActiveSection.id : selectedNodeId ?? activeFolderNodeId}
-                        viewMode={noteRowViewMode}
-                      />
-                    ))}
-                    {hasMoreNavigationNodes ? (
-                      <button
-                        className="note-folder-overview__show-more"
-                        onClick={() => setVisibleNavigationCount((count) => count + NAVIGATION_PAGE_SIZE)}
-                        type="button"
-                      >
-                        Show more ({sortedNavigationTreeNodes.length - visibleNavigationCount} remaining)
-                      </button>
-                    ) : null}
-                  </div>
-                ) : (
-                  <p className="muted">{notesNavigationMode === "section" ? "No folders in this section yet." : activeSection ? "No notes or subfolders in this section yet." : "No child folders yet."}</p>
-                )}
-              </div>
+                  ) : null}
+                  {sortedNavigationTreeNodes.length > 0 ? (
+                    <div className="tree-folder__children">
+                      {visibleNavigationTreeNodes.map((folderNode, index) => (
+                        <NoteTreeItem
+                          expandedFolderIds={expandedFolderIds}
+                          foldersOnly
+                          key={`${folderNode.id}:${index}`}
+                          node={folderNode}
+                          notes={allNotes}
+                          noteViewCounts={noteViewCounts}
+                          onNoteDragEnd={onNoteDragEnd}
+                          onNoteDragStart={onNoteDragStart}
+                          onNoteDrop={onMoveNote}
+                          pinnedNoteIds={pinnedNoteIds}
+                          onOpenHistory={onOpenNoteHistory}
+                          onRenameFile={onRenameNote}
+                          onSelect={onSelectNote}
+                          onTogglePinned={onTogglePinnedNote}
+                          onToggleStar={onToggleNoteStar}
+                          onToggleFolder={onToggleFolder}
+                          searchStateByNodeId={new Map()}
+                          selectedNodeId={isNoteDragActive && effectiveActiveSection ? effectiveActiveSection.id : selectedNodeId ?? activeFolderNodeId}
+                          viewMode={noteRowViewMode}
+                        />
+                      ))}
+                      {hasMoreNavigationNodes ? (
+                        <button
+                          className="note-folder-overview__show-more"
+                          onClick={() => setVisibleNavigationCount((count) => count + NAVIGATION_PAGE_SIZE)}
+                          type="button"
+                        >
+                          Show more ({sortedNavigationTreeNodes.length - visibleNavigationCount} remaining)
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="muted">{notesNavigationMode === "section" ? "No folders in this section yet." : activeSection ? "No notes or subfolders in this section yet." : "No child folders yet."}</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
             ) : null}
-          </section>
 
-          {!isTreeCollapsed ? (
-            <button
-              aria-label="Resize note overview panes"
-              aria-orientation="vertical"
-              className={`note-folder-overview__resize-handle ${isResizingOverview ? "is-active" : ""}`}
-              onKeyDown={handleResizeKeyDown}
-              onPointerDown={handleResizeStart}
-              role="separator"
-              type="button"
-            >
-              <span className="note-folder-overview__resize-line" />
-            </button>
-          ) : null}
-
-          {notesNavigationMode === "section" ? (
-            previewPanel
-          ) : (
-            <div
-              className={`note-folder-overview__notes-split ${isResizingPreview ? "is-resizing" : ""}`}
-              ref={previewSplitRef}
-              style={{
-                gridTemplateColumns: isNotesCollapsed
-                  ? getCollapsedOverviewColumns()
-                  : getResizableOverviewColumns(previewSplitPercent),
-              }}
-            >
-              <section
-                className={`note-folder-overview__section note-folder-overview__section--notes is-list ${isNotesCollapsed ? "is-collapsed" : ""}`}
-              >
-                <div className="note-folder-overview__section-header">
+            {isSectionView ? (
+              <div className="note-folder-overview__overview-block note-folder-overview__overview-block--notes">
+                <div className="note-folder-overview__section-toolbar">
                   <div className="note-folder-overview__section-heading">
                     <button
                       aria-label={isNotesCollapsed ? "Expand notes list pane" : "Collapse notes list pane"}
@@ -2186,39 +2151,41 @@ function NoteFolderOverviewPanel({
                   </div>
                   {!isNotesCollapsed ? (
                     <div className="note-folder-overview__section-actions">
-                      <div className="note-folder-overview__sort-menu" ref={folderNotesSortMenuRef}>
-                        <button
-                          aria-expanded={isFolderNotesSortMenuOpen}
-                          aria-haspopup="menu"
-                          aria-label={`${sortItemsLabel}: ${activeFolderNotesSortOption.label}`}
-                          className="icon-action note-folder-overview__sort-trigger"
-                          onClick={() => setIsFolderNotesSortMenuOpen((current) => !current)}
-                          title={`${sortItemsLabel}: ${activeFolderNotesSortOption.label}`}
-                          type="button"
-                        >
-                          <ArrowUpDown size={15} />
-                        </button>
-                        {isFolderNotesSortMenuOpen ? (
-                          <div aria-label={sortItemsLabel} className="note-folder-overview__sort-popup" role="menu">
-                            {FOLDER_NOTES_SORT_OPTIONS.map((option) => (
-                              <button
-                                key={option.value}
-                                aria-checked={folderNotesSortMode === option.value}
-                                className={`note-folder-overview__sort-option ${folderNotesSortMode === option.value ? "is-active" : ""}`}
-                                onClick={() => {
-                                  setFolderNotesSortMode(option.value);
-                                  setIsFolderNotesSortMenuOpen(false);
-                                }}
-                                role="menuitemradio"
-                                type="button"
-                              >
-                                <span>{option.label}</span>
-                                {folderNotesSortMode === option.value ? <Check size={14} /> : null}
-                              </button>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
+                      {notesNavigationMode !== "section" ? (
+                        <div className="note-folder-overview__sort-menu" ref={folderNotesSortMenuRef}>
+                          <button
+                            aria-expanded={isFolderNotesSortMenuOpen}
+                            aria-haspopup="menu"
+                            aria-label={`${sortItemsLabel}: ${activeFolderNotesSortOption.label}`}
+                            className="icon-action note-folder-overview__sort-trigger"
+                            onClick={() => setIsFolderNotesSortMenuOpen((current) => !current)}
+                            title={`${sortItemsLabel}: ${activeFolderNotesSortOption.label}`}
+                            type="button"
+                          >
+                            <ArrowUpDown size={15} />
+                          </button>
+                          {isFolderNotesSortMenuOpen ? (
+                            <div aria-label={sortItemsLabel} className="note-folder-overview__sort-popup" role="menu">
+                              {FOLDER_NOTES_SORT_OPTIONS.map((option) => (
+                                <button
+                                  key={option.value}
+                                  aria-checked={folderNotesSortMode === option.value}
+                                  className={`note-folder-overview__sort-option ${folderNotesSortMode === option.value ? "is-active" : ""}`}
+                                  onClick={() => {
+                                    setFolderNotesSortMode(option.value);
+                                    setIsFolderNotesSortMenuOpen(false);
+                                  }}
+                                  role="menuitemradio"
+                                  type="button"
+                                >
+                                  <span>{option.label}</span>
+                                  {folderNotesSortMode === option.value ? <Check size={14} /> : null}
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                       <div className="note-folder-overview__sort-menu" ref={folderNotesViewMenuRef}>
                         <button
                           aria-expanded={isFolderNotesViewMenuOpen}
@@ -2257,59 +2224,281 @@ function NoteFolderOverviewPanel({
                   ) : null}
                 </div>
                 {!isNotesCollapsed ? (
-                  <div className="note-folder-overview__notes-body is-list">
-                    {sortedChildNotes.length > 0 ? (
-                      <>
-                        {visibleChildNotes.map((noteItem) =>
-                          useCompactCards ? (
-                            <NoteCompactCard
-                              key={noteItem.id}
-                              isSelected={selectedNodeId === noteItem.id}
-                              note={noteItem}
-                              onSelect={() => onSelectNote(noteItem.id)}
-                            />
-                          ) : (
-                            <NoteSummaryCard
-                              key={noteItem.id}
-                              isSelected={selectedNodeId === noteItem.id}
-                              isPinned={pinnedNoteIds.has(noteItem.id)}
-                              note={noteItem}
-                              noteViewCount={noteViewCounts.get(`${noteItem.kind}:${noteItem.id}`) ?? 0}
+                  notesNavigationMode === "section" ? (
+                    <div className="note-folder-overview__tree note-folder-overview__notes-tree">
+                      {sortedNavigationTreeNodes.length > 0 ? (
+                        <div className="tree-folder__children">
+                          {visibleNavigationTreeNodes.map((folderNode, index) => (
+                            <NoteTreeItem
+                              expandedFolderIds={expandedFolderIds}
+                              foldersOnly={false}
+                              key={`${folderNode.id}:notes:${index}`}
+                              node={folderNode}
+                              notes={allNotes}
+                              noteViewCounts={noteViewCounts}
                               onNoteDragEnd={onNoteDragEnd}
                               onNoteDragStart={onNoteDragStart}
-                              onOpenHistory={onOpenNoteHistory ? () => onOpenNoteHistory(noteItem) : undefined}
+                              onNoteDrop={onMoveNote}
+                              pinnedNoteIds={pinnedNoteIds}
+                              onOpenHistory={onOpenNoteHistory}
                               onRenameFile={onRenameNote}
-                              onSelect={() => onSelectNote(noteItem.id)}
-                              onTogglePinned={onTogglePinnedNote ? (nextPinned) => onTogglePinnedNote(noteItem.id, nextPinned) : undefined}
-                              onToggleStar={(nextStarred) => onToggleNoteStar(noteItem, nextStarred)}
+                              onSelect={onSelectNote}
+                              onTogglePinned={onTogglePinnedNote}
+                              onToggleStar={onToggleNoteStar}
+                              onToggleFolder={onToggleFolder}
+                              searchStateByNodeId={new Map()}
+                              selectedNodeId={selectedNodeId ?? activeFolderNodeId}
                               viewMode={noteRowViewMode}
                             />
-                          ),
-                        )}
-                        {hasMoreChildNotes ? (
+                          ))}
+                          {hasMoreNavigationNodes ? (
+                            <button
+                              className="note-folder-overview__show-more"
+                              onClick={() => setVisibleNavigationCount((count) => count + NAVIGATION_PAGE_SIZE)}
+                              type="button"
+                            >
+                              Show more ({sortedNavigationTreeNodes.length - visibleNavigationCount} remaining)
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <p className="muted">{directItemsEmptyText}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="note-folder-overview__notes-body is-list">
+                      {sortedChildNotes.length > 0 ? (
+                        <>
+                          {visibleChildNotes.map((noteItem) =>
+                            useCompactCards ? (
+                              <NoteCompactCard
+                                key={noteItem.id}
+                                isSelected={selectedNodeId === noteItem.id}
+                                note={noteItem}
+                                onSelect={() => onSelectNote(noteItem.id)}
+                              />
+                            ) : (
+                              <NoteSummaryCard
+                                key={noteItem.id}
+                                isSelected={selectedNodeId === noteItem.id}
+                                isPinned={pinnedNoteIds.has(noteItem.id)}
+                                note={noteItem}
+                                noteViewCount={noteViewCounts.get(`${noteItem.kind}:${noteItem.id}`) ?? 0}
+                                onNoteDragEnd={onNoteDragEnd}
+                                onNoteDragStart={onNoteDragStart}
+                                onOpenHistory={onOpenNoteHistory ? () => onOpenNoteHistory(noteItem) : undefined}
+                                onRenameFile={onRenameNote}
+                                onSelect={() => onSelectNote(noteItem.id)}
+                                onTogglePinned={onTogglePinnedNote ? (nextPinned) => onTogglePinnedNote(noteItem.id, nextPinned) : undefined}
+                                onToggleStar={(nextStarred) => onToggleNoteStar(noteItem, nextStarred)}
+                                viewMode={noteRowViewMode}
+                              />
+                            ),
+                          )}
+                          {hasMoreChildNotes ? (
+                            <button
+                              className="note-folder-overview__show-more"
+                              onClick={() => setVisibleChildCount((count) => count + CHILD_NOTES_PAGE_SIZE)}
+                              type="button"
+                            >
+                              Show more ({sortedChildNotes.length - visibleChildCount} remaining)
+                            </button>
+                          ) : null}
+                        </>
+                      ) : (
+                        <p className="muted">{directItemsEmptyText}</p>
+                      )}
+                    </div>
+                  )
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+
+          {!isSectionView ? (
+            <>
+              {!isTreeCollapsed ? (
+                <button
+                  aria-label="Resize note overview panes"
+                  aria-orientation="vertical"
+                  className={`note-folder-overview__resize-handle ${isResizingOverview ? "is-active" : ""}`}
+                  onKeyDown={handleResizeKeyDown}
+                  onPointerDown={handleResizeStart}
+                  role="separator"
+                  type="button"
+                >
+                  <span className="note-folder-overview__resize-line" />
+                </button>
+              ) : null}
+
+              <div
+                className={`note-folder-overview__notes-split ${isResizingPreview ? "is-resizing" : ""}`}
+                ref={previewSplitRef}
+                style={{
+                  gridTemplateColumns: isNotesCollapsed
+                    ? getCollapsedOverviewColumns()
+                    : getResizableOverviewColumns(previewSplitPercent),
+                }}
+              >
+                <section className={`note-folder-overview__section note-folder-overview__section--notes is-list ${isNotesCollapsed ? "is-collapsed" : ""}`}>
+                  <div className="note-folder-overview__section-toolbar">
+                    <div className="note-folder-overview__section-heading">
+                      <button
+                        aria-label={isNotesCollapsed ? "Expand notes list pane" : "Collapse notes list pane"}
+                        className="icon-action note-folder-overview__collapse-toggle"
+                        onClick={toggleNotesCollapsed}
+                        title={isNotesCollapsed ? "Expand notes list pane" : "Collapse notes list pane"}
+                        type="button"
+                      >
+                        {isNotesCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+                      </button>
+                      {!isNotesCollapsed ? <h4>{directItemsHeading}</h4> : null}
+                    </div>
+                    {!isNotesCollapsed ? (
+                      <div className="note-folder-overview__section-actions">
+                        <div className="note-folder-overview__sort-menu" ref={folderNotesSortMenuRef}>
                           <button
-                            className="note-folder-overview__show-more"
-                            onClick={() => setVisibleChildCount((count) => count + CHILD_NOTES_PAGE_SIZE)}
+                            aria-expanded={isFolderNotesSortMenuOpen}
+                            aria-haspopup="menu"
+                            aria-label={`${sortItemsLabel}: ${activeFolderNotesSortOption.label}`}
+                            className="icon-action note-folder-overview__sort-trigger"
+                            onClick={() => setIsFolderNotesSortMenuOpen((current) => !current)}
+                            title={`${sortItemsLabel}: ${activeFolderNotesSortOption.label}`}
                             type="button"
                           >
-                            Show more ({sortedChildNotes.length - visibleChildCount} remaining)
+                            <ArrowUpDown size={15} />
                           </button>
-                        ) : null}
-                      </>
-                    ) : (
-                      <p className="muted">{directItemsEmptyText}</p>
-                    )}
+                          {isFolderNotesSortMenuOpen ? (
+                            <div aria-label={sortItemsLabel} className="note-folder-overview__sort-popup" role="menu">
+                              {FOLDER_NOTES_SORT_OPTIONS.map((option) => (
+                                <button
+                                  key={option.value}
+                                  aria-checked={folderNotesSortMode === option.value}
+                                  className={`note-folder-overview__sort-option ${folderNotesSortMode === option.value ? "is-active" : ""}`}
+                                  onClick={() => {
+                                    setFolderNotesSortMode(option.value);
+                                    setIsFolderNotesSortMenuOpen(false);
+                                  }}
+                                  role="menuitemradio"
+                                  type="button"
+                                >
+                                  <span>{option.label}</span>
+                                  {folderNotesSortMode === option.value ? <Check size={14} /> : null}
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="note-folder-overview__sort-menu" ref={folderNotesViewMenuRef}>
+                          <button
+                            aria-expanded={isFolderNotesViewMenuOpen}
+                            aria-haspopup="menu"
+                            aria-label={`Change note row view: ${activeNoteRowViewOption.label}`}
+                            className="note-folder-overview__view-trigger"
+                            onClick={() => setIsFolderNotesViewMenuOpen((current) => !current)}
+                            title={`Change note row view: ${activeNoteRowViewOption.label}`}
+                            type="button"
+                          >
+                            View
+                          </button>
+                          {isFolderNotesViewMenuOpen ? (
+                            <div aria-label="Change note row view" className="note-folder-overview__sort-popup" role="menu">
+                              {NOTE_ROW_VIEW_OPTIONS.map((option) => (
+                                <button
+                                  key={option.value}
+                                  aria-checked={noteRowViewMode === option.value}
+                                  className={`note-folder-overview__sort-option ${noteRowViewMode === option.value ? "is-active" : ""}`}
+                                  onClick={() => {
+                                    setNoteRowViewMode(option.value);
+                                    setIsFolderNotesViewMenuOpen(false);
+                                  }}
+                                  role="menuitemradio"
+                                  title={option.description}
+                                  type="button"
+                                >
+                                  <span>{option.label}</span>
+                                  {noteRowViewMode === option.value ? <Check size={14} /> : null}
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
-              </section>
+                  {!isNotesCollapsed ? (
+                    <div className="note-folder-overview__notes-body is-list">
+                      {sortedChildNotes.length > 0 ? (
+                        <>
+                          {visibleChildNotes.map((noteItem) =>
+                            useCompactCards ? (
+                              <NoteCompactCard
+                                key={noteItem.id}
+                                isSelected={selectedNodeId === noteItem.id}
+                                note={noteItem}
+                                onSelect={() => onSelectNote(noteItem.id)}
+                              />
+                            ) : (
+                              <NoteSummaryCard
+                                key={noteItem.id}
+                                isSelected={selectedNodeId === noteItem.id}
+                                isPinned={pinnedNoteIds.has(noteItem.id)}
+                                note={noteItem}
+                                noteViewCount={noteViewCounts.get(`${noteItem.kind}:${noteItem.id}`) ?? 0}
+                                onNoteDragEnd={onNoteDragEnd}
+                                onNoteDragStart={onNoteDragStart}
+                                onOpenHistory={onOpenNoteHistory ? () => onOpenNoteHistory(noteItem) : undefined}
+                                onRenameFile={onRenameNote}
+                                onSelect={() => onSelectNote(noteItem.id)}
+                                onTogglePinned={onTogglePinnedNote ? (nextPinned) => onTogglePinnedNote(noteItem.id, nextPinned) : undefined}
+                                onToggleStar={(nextStarred) => onToggleNoteStar(noteItem, nextStarred)}
+                                viewMode={noteRowViewMode}
+                              />
+                            ),
+                          )}
+                          {hasMoreChildNotes ? (
+                            <button
+                              className="note-folder-overview__show-more"
+                              onClick={() => setVisibleChildCount((count) => count + CHILD_NOTES_PAGE_SIZE)}
+                              type="button"
+                            >
+                              Show more ({sortedChildNotes.length - visibleChildCount} remaining)
+                            </button>
+                          ) : null}
+                        </>
+                      ) : (
+                        <p className="muted">{directItemsEmptyText}</p>
+                      )}
+                    </div>
+                  ) : null}
+                </section>
 
-              {!isNotesCollapsed ? (
+                {!isNotesCollapsed ? (
+                  <button
+                    aria-label="Resize notes preview panes"
+                    aria-orientation="vertical"
+                    className={`note-folder-overview__resize-handle ${isResizingPreview ? "is-active" : ""}`}
+                    onKeyDown={handlePreviewResizeKeyDown}
+                    onPointerDown={handlePreviewResizeStart}
+                    role="separator"
+                    type="button"
+                  >
+                    <span className="note-folder-overview__resize-line" />
+                  </button>
+                ) : null}
+
+                {previewPanel}
+              </div>
+            </>
+          ) : (
+            <>
+              {!isOverviewPaneCollapsed ? (
                 <button
                   aria-label="Resize notes preview panes"
                   aria-orientation="vertical"
-                  className={`note-folder-overview__resize-handle ${isResizingPreview ? "is-active" : ""}`}
-                  onKeyDown={handlePreviewResizeKeyDown}
-                  onPointerDown={handlePreviewResizeStart}
+                  className={`note-folder-overview__resize-handle ${isResizingOverview ? "is-active" : ""}`}
+                  onKeyDown={handleResizeKeyDown}
+                  onPointerDown={handleResizeStart}
                   role="separator"
                   type="button"
                 >
@@ -2318,7 +2507,7 @@ function NoteFolderOverviewPanel({
               ) : null}
 
               {previewPanel}
-            </div>
+            </>
           )}
         </div>
       </div>
