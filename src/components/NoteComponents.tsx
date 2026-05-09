@@ -1990,12 +1990,12 @@ function NoteFolderOverviewPanel({
           className={`note-folder-overview__split ${isResizingOverview ? "is-resizing" : ""}`}
           ref={splitRef}
           style={{
-            gridTemplateColumns: (isSectionView ? isOverviewPaneCollapsed : isTreeCollapsed)
+            gridTemplateColumns: (isSectionView ? isNotesCollapsed : isTreeCollapsed)
               ? getCollapsedOverviewColumns()
               : getResizableOverviewColumns(isSectionView ? previewSplitPercent : overviewSplitPercent),
           }}
         >
-          <section className={`note-folder-overview__section note-folder-overview__section--overview ${(isSectionView ? isOverviewPaneCollapsed : isTreeCollapsed) ? "is-collapsed" : ""}`}>
+          <section className={`note-folder-overview__section note-folder-overview__section--overview ${(isSectionView ? isNotesCollapsed : isTreeCollapsed) ? "is-collapsed" : ""}`}>
             {!isSectionView ? (
             <div className="note-folder-overview__overview-block note-folder-overview__overview-block--tree">
               <div className="note-folder-overview__section-toolbar">
@@ -2502,7 +2502,7 @@ function NoteFolderOverviewPanel({
             </>
           ) : (
             <>
-              {!isOverviewPaneCollapsed ? (
+              {!isNotesCollapsed ? (
                 <button
                   aria-label="Resize notes preview panes"
                   aria-orientation="vertical"

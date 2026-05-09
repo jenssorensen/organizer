@@ -2994,6 +2994,14 @@ button.note-breadcrumbs__item:hover {
   opacity: 0.6;
 }
 
+.note-folder-overview__section--overview.is-collapsed ~ .note-folder-overview__section--preview .note-folder-overview__no-preview {
+  display: none;
+}
+
+.note-folder-overview__section--notes.is-collapsed ~ .note-folder-overview__section--preview .note-folder-overview__no-preview {
+  display: none;
+}
+
 
 
 .note-folder-overview__section-toolbar {

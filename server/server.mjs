@@ -1,6 +1,16 @@
 import { createServer } from "node:http";
 import { watch } from "node:fs";
 import { copyFile, cp, mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
+
+/**
+ * Write content to a file atomically: write to a .tmp file first then
+ * rename into place so a crash mid-write never leaves a corrupt file.
+ */
+async function atomicWriteFile(filePath, content, encoding = "utf8") {
+  const tmpPath = `${filePath}.tmp`;
+  await writeFile(tmpPath, content, encoding);
+  await rename(tmpPath, filePath);
+}
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { exec, execFile } from "node:child_process";
@@ -650,7 +660,7 @@ async function handleSidebarOrder(request, response) {
       }
 
       const payload = JSON.stringify({ order: parsed.order }, null, 2);
-      await writeFile(sidebarOrderPath, `${payload}\n`, "utf8");
+      await atomicWriteFile(sidebarOrderPath, `${payload}\n`, "utf8");
       response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
       response.end(payload);
       return;
@@ -828,7 +838,7 @@ async function handleNotes(request, response) {
         return;
       }
 
-      await writeFile(absolutePath, parsed.content, "utf8");
+      await atomicWriteFile(absolutePath, parsed.content, "utf8");
 
       const starredNotes = await readStarredNotes();
       const starredMap = toStarredNotesMap(starredNotes.entries);
@@ -924,7 +934,7 @@ async function handleNoteImport(request, response) {
       const normalizedPath = normalizeRelativeDocsPath(note.sourcePath);
       const absolutePath = resolveNoteAbsolutePath(normalizedPath);
       await mkdir(path.dirname(absolutePath), { recursive: true });
-      await writeFile(absolutePath, note.content, "utf8");
+      await atomicWriteFile(absolutePath, note.content, "utf8");
     }
 
     if (payload.starredNotePaths.length > 0) {
@@ -1843,7 +1853,7 @@ async function readBookmarksTree() {
 
 async function writeBookmarksTree(tree) {
   const payload = JSON.stringify({ tree: normalizeBookmarkTreeRoot(tree) }, null, 2);
-  await writeFile(bookmarksPath, `${payload}\n`, "utf8");
+  await atomicWriteFile(bookmarksPath, `${payload}\n`, "utf8");
   scheduleDataChange("bookmarks");
 }
 
@@ -1862,7 +1872,7 @@ async function readRecentDocuments() {
 }
 
 async function writeRecentDocuments(payload) {
-  await writeFile(recentDocumentsPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  await atomicWriteFile(recentDocumentsPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
 async function readTodoItems() {
@@ -1880,7 +1890,7 @@ async function readTodoItems() {
 }
 
 async function writeTodoItems(payload) {
-  await writeFile(todoItemsPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  await atomicWriteFile(todoItemsPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
   scheduleDataChange("todo");
 }
 
@@ -1912,7 +1922,7 @@ function parseJsonWithFallback(contents, fallbackValue) {
 }
 
 async function writeStarredNotes(payload) {
-  await writeFile(starredNotesPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  await atomicWriteFile(starredNotesPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
 async function ensureRestorePointsDirectory() {
@@ -2767,7 +2777,7 @@ async function readTrashMeta() {
 }
 
 async function writeTrashMeta(entries) {
-  await writeFile(trashMetaPath, JSON.stringify({ entries }, null, 2), "utf8");
+  await atomicWriteFile(trashMetaPath, JSON.stringify({ entries }, null, 2), "utf8");
 }
 
 async function handleDocsTrash(url, request, response) {

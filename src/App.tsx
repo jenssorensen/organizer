@@ -150,6 +150,7 @@ import {
   PanelRightClose,
   Settings,
 } from "lucide-react";
+import { apiFetch as fetch } from "./apiFetch";
 
 const defaultNavOrder: SectionId[] = ["notes", "bookmarks", "todo", "starred", "recent"];
 const sidebarApiBase = "";
@@ -2473,7 +2474,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       onMoveSection={section === "notes" ? handleMoveNoteSection : undefined}
       onHideSectionGroup={section === "notes" && isMultiRoot ? handleHideNoteSectionGroup : undefined}
       onRenameSection={section === "notes" ? handleRenameNoteSection : undefined}
-      onSelectSection={(nodeId) => navigateNoteSelection(nodeId, "notes")}
+      onSelectSection={(nodeId) => navigateNoteSelection(nodeId === "__general__" ? ROOT_NOTE_NODE_ID : nodeId, "notes")}
       onSetSectionColor={section === "notes" ? handleSetNoteSectionColor : undefined}
       onSelectFolder={navigateNoteSelection}
       onStartEditingNote={section === "notes" ? handleStartEditingNote : undefined}

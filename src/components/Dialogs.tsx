@@ -32,6 +32,7 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
+import { apiFetch as fetch } from "../apiFetch";
 import type { BookmarkDialogState, Note, NavItem, NoteCreationDialogState, QuickCaptureState, RestorePointSummary, SectionId, TodoItem } from "../types";
 import {
   SUPPORTED_NOTE_FILE_TYPES,
