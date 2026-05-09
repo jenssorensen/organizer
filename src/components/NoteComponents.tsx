@@ -3033,7 +3033,7 @@ export function TrashPanel({
         <div className="dialog-card__header">
           <div>
             <p className="eyebrow">Deleted notes</p>
-            <h3 id="trash-panel-title">Trash {entries.length > 0 ? `(${entries.length})` : ""}</h3>
+            <h3 id="trash-panel-title">Trash{entries.length > 0 ? ` (${entries.length})` : ""}</h3>
           </div>
           <div className="trash-dialog__header-actions trash-panel__header-actions">
             {entries.length > 0 ? (

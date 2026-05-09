@@ -153,6 +153,7 @@ import { apiFetch as fetch } from "./apiFetch";
 const defaultNavOrder: SectionId[] = ["notes", "bookmarks", "todo", "starred", "recent"];
 const sidebarApiBase = "";
 const ROOT_NOTE_NODE_ID = "__root__";
+const GENERAL_NOTE_SECTION_ID = "__general__";
 const TODO_COLOR_DEFAULT = "#78e6c6";
 const STORED_ACTIVE_SECTION_KEY = "organizer:active-section";
 const STORED_MARKDOWN_EDITOR_PREVIEW_VISIBILITY_KEY = "organizer:markdown-editor-preview-visible";
@@ -898,7 +899,7 @@ function App() {
       return;
     }
 
-    setSelectedNoteNodeId(findNoteSectionById(noteSections, "__general__")?.id ?? ROOT_NOTE_NODE_ID);
+    setSelectedNoteNodeId(findNoteSectionById(noteSections, GENERAL_NOTE_SECTION_ID)?.id ?? ROOT_NOTE_NODE_ID);
   }, [hasRootLevelNotes, notes.length, noteSections, section, selectedNoteNodeId]);
 
   useEffect(() => {
@@ -1615,7 +1616,7 @@ function App() {
     }
 
     if (!foundSection && noteSections.length > 0) {
-      return findNoteSectionById(noteSections, "__general__") ?? noteSections[0];
+      return findNoteSectionById(noteSections, GENERAL_NOTE_SECTION_ID) ?? noteSections[0];
     }
 
     return foundSection;
@@ -2472,7 +2473,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       onMoveSection={section === "notes" ? handleMoveNoteSection : undefined}
       onHideSectionGroup={section === "notes" && isMultiRoot ? handleHideNoteSectionGroup : undefined}
       onRenameSection={section === "notes" ? handleRenameNoteSection : undefined}
-      onSelectSection={(nodeId) => navigateNoteSelection(nodeId === "__general__" ? ROOT_NOTE_NODE_ID : nodeId, "notes")}
+      onSelectSection={(nodeId) => navigateNoteSelection(nodeId === GENERAL_NOTE_SECTION_ID ? ROOT_NOTE_NODE_ID : nodeId, "notes")}
       onSetSectionColor={section === "notes" ? handleSetNoteSectionColor : undefined}
       onSelectFolder={navigateNoteSelection}
       onStartEditingNote={section === "notes" ? handleStartEditingNote : undefined}

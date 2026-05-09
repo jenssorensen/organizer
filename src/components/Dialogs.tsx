@@ -1813,7 +1813,7 @@ function PinnedNotesDialog({
         <div className="dialog-card__header">
           <div>
             <p className="eyebrow">Dashboard</p>
-            <h3 id="pinned-dialog-title">Pinned notes{pinnedNotes.length > 0 ? ` (${pinnedNotes.length})` : ""}</h3>
+            <h3 id="pinned-dialog-title">Pinned Notes{pinnedNotes.length > 0 ? ` (${pinnedNotes.length})` : ""}</h3>
           </div>
           <button aria-label="Close pinned notes" className="icon-action" onClick={onClose} title="Close" type="button">
             <X size={16} />
