@@ -6631,6 +6631,19 @@ button.note-breadcrumbs__item:hover {
 
 /* ── Triage panel ────────────────────────────────────────────────────────── */
 
+.triage-dialog.dialog-card {
+  width: min(620px, 96vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.triage-dialog .triage-panel__content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .triage-panel__tabs {
   display: flex;
   flex-wrap: wrap;
@@ -7220,20 +7233,24 @@ button.note-breadcrumbs__item:hover {
 
 /* === Trash Panel === */
 
-.trash-panel {
-  padding: 24px;
-}
-
-.trash-panel__header {
+.trash-dialog.dialog-card {
+  width: min(600px, 96vw);
+  max-height: 80vh;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 16px;
+  flex-direction: column;
 }
 
-.trash-panel__header-actions {
+.trash-dialog__header-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.trash-dialog .trash-panel__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 20px 20px;
 }
 
 .trash-panel__list {
