@@ -22,6 +22,7 @@ import {
   KeyboardShortcutsDialog,
   TaskTemplateDialog,
   TriagePanel,
+  PinnedNotesDialog,
   QuickCaptureDialog,
   NOTE_TEMPLATES,
 } from "./components/Dialogs";
@@ -136,6 +137,7 @@ import {
   ExternalLink,
   PanelLeftClose,
   PanelLeftOpen,
+  Pin,
   Minus,
   Plus,
   Search,
@@ -590,6 +592,7 @@ function App() {
   const [isRecentPanelOpen, setIsRecentPanelOpen] = useState(false);
   const [openFeedPopup, setOpenFeedPopup] = useState<"starred" | "recent" | null>(null);
   const [pinnedNoteIds, setPinnedNoteIds] = useState<string[]>(getStoredPinnedNotes);
+  const [showPinnedPanel, setShowPinnedPanel] = useState(false);
   const [syncInterval, setSyncInterval] = useState<number>(getStoredSyncInterval);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -2092,7 +2095,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       }
 
       // Close tag browser / version history / broken links / prefs / feed panels with Escape
-      if (isEscapeKey && (isTagBrowserOpen || isVersionHistoryOpen || isBrokenLinksOpen || isExportImportOpen || isPrefsOpen || isStarredPanelOpen || isRecentPanelOpen || openFeedPopup !== null || showTrashPanel || showGraphView || showDailyNotes || showWorkspaceSwitcher || showTriagePanel || isKeyboardShortcutsOpen || showTaskTemplateDialog || isQuickCaptureOpen)) {
+      if (isEscapeKey && (isTagBrowserOpen || isVersionHistoryOpen || isBrokenLinksOpen || isExportImportOpen || isPrefsOpen || isStarredPanelOpen || isRecentPanelOpen || openFeedPopup !== null || showTrashPanel || showGraphView || showDailyNotes || showWorkspaceSwitcher || showTriagePanel || showPinnedPanel || isKeyboardShortcutsOpen || showTaskTemplateDialog || isQuickCaptureOpen)) {
         setIsTagBrowserOpen(false);
         setIsVersionHistoryOpen(false);
         setIsBrokenLinksOpen(false);
@@ -2106,6 +2109,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
         setShowDailyNotes(false);
         setShowWorkspaceSwitcher(false);
         setShowTriagePanel(false);
+        setShowPinnedPanel(false);
         setIsKeyboardShortcutsOpen(false);
         setShowTaskTemplateDialog(false);
         setIsQuickCaptureOpen(false);
@@ -4311,6 +4315,15 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
           </button>
           <button
             className="sidebar__tool-btn"
+            onClick={() => setShowPinnedPanel((c) => !c)}
+            title="Pinned notes"
+            type="button"
+          >
+            <Pin size={14} />
+            {!isSidebarCollapsed ? <span>Pinned ({pinnedNotes.length})</span> : null}
+          </button>
+          <button
+            className="sidebar__tool-btn"
             onClick={() => setIsKeyboardShortcutsOpen((c) => !c)}
             title={keyboardShortcutsTitle}
             type="button"
@@ -5377,44 +5390,6 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
 
         </section>
 
-        {!isMarkdownImmersive && pinnedNotes.length > 0 ? (
-          <section className="card dashboard-widgets-card">
-            <div className="card__header">
-              <div>
-                <p className="eyebrow">Dashboard</p>
-                <h3>Pinned notes ({pinnedNotes.length})</h3>
-              </div>
-            </div>
-            <div className="dashboard-widgets__grid">
-              {pinnedNotes.map((note) => (
-                <article key={note.id} className="dashboard-widget">
-                  <div className="dashboard-widget__header">
-                    <h4 className="dashboard-widget__title">{note.title}</h4>
-                    <button
-                      aria-label={`Unpin ${note.title}`}
-                      className="icon-action dashboard-widget__unpin"
-                      onClick={() => handleUnpinNote(note.id)}
-                      title="Unpin"
-                      type="button"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                  <p className="dashboard-widget__summary">{note.summary || note.content.slice(0, 120).replace(/[#*`]/g, "").trim()}</p>
-                  <button
-                    className="mini-action dashboard-widget__open"
-                    onClick={() => openNote(note)}
-                    type="button"
-                  >
-                    <ExternalLink size={12} />
-                    Open
-                  </button>
-                </article>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
       </main>
       <BookmarkDialog
         onChange={handleBookmarkDialogChange}
@@ -5785,6 +5760,15 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
           onClose={() => setShowTriagePanel(false)}
           onSelectTodo={(id) => { navigateTodoSelection(id); setShowTriagePanel(false); }}
           onOpenNote={(note) => { openNote(note); setShowTriagePanel(false); }}
+        />
+      ) : null}
+
+      {showPinnedPanel ? (
+        <PinnedNotesDialog
+          pinnedNotes={pinnedNotes}
+          onClose={() => setShowPinnedPanel(false)}
+          onUnpin={(id) => handleUnpinNote(id)}
+          onOpen={(note) => { openNote(note); setShowPinnedPanel(false); }}
         />
       ) : null}
 

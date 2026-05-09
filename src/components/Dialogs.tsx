@@ -9,6 +9,7 @@ import {
   Command,
   Database,
   Download,
+  ExternalLink,
   FileCode2,
   FileText,
   Filter,
@@ -1687,21 +1688,22 @@ function TriagePanel({
     { id: "this-week", label: "This Week", count: dueThisWeekTodos.length, icon: CalendarClock },
     { id: "waiting", label: "Waiting", count: waitingTodos.length, icon: Clock },
     { id: "stale-notes", label: "Stale Notes", count: staleNotes.length, icon: FileText },
-    { id: "unsorted-bookmarks", label: "Unsorted", count: unsortedBookmarks.length, icon: Filter },
+    { id: "unsorted-bookmarks", label: "Unsorted Bookmarks", count: unsortedBookmarks.length, icon: Bookmark },
   ];
 
   return (
-    <div className="card search-card">
-      <div className="card__header">
-        <div>
-          <p className="eyebrow">Smart triage</p>
-          <h3>Triage views</h3>
+    <div className="dialog-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div aria-labelledby="triage-dialog-title" className="dialog-card triage-dialog" role="dialog">
+        <div className="dialog-card__header">
+          <div>
+            <p className="eyebrow">Smart triage</p>
+            <h3 id="triage-dialog-title">Triage</h3>
+          </div>
+          <button aria-label="Close triage" className="icon-action" onClick={onClose} title="Close" type="button">
+            <X size={16} />
+          </button>
         </div>
-        <button className="icon-action" onClick={onClose} type="button">
-          <PanelRightClose size={14} />
-        </button>
-      </div>
-      <div className="triage-panel__tabs">
+        <div className="triage-panel__tabs">
         {views.map((view) => {
           const Icon = view.icon;
           return (
@@ -1780,12 +1782,72 @@ function TriagePanel({
                 onClick={() => window.open(bm.url, "_blank", "noopener,noreferrer")}
                 type="button"
               >
-                <Filter size={13} />
+                <Bookmark size={13} />
                 <span className="triage-panel__item-title">{bm.title}</span>
                 <span className="triage-panel__item-date">{bm.domain}</span>
               </button>
             ))
           )
+        )}
+      </div>
+      </div>
+    </div>
+  );
+}
+
+function PinnedNotesDialog({
+  pinnedNotes,
+  onClose,
+  onUnpin,
+  onOpen,
+}: {
+  pinnedNotes: Note[];
+  onClose: () => void;
+  onUnpin: (noteId: string) => void;
+  onOpen: (note: Note) => void;
+}) {
+  return (
+    <div className="dialog-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div aria-labelledby="pinned-dialog-title" className="dialog-card pinned-dialog" role="dialog">
+        <div className="dialog-card__header">
+          <div>
+            <p className="eyebrow">Dashboard</p>
+            <h3 id="pinned-dialog-title">Pinned notes{pinnedNotes.length > 0 ? ` (${pinnedNotes.length})` : ""}</h3>
+          </div>
+          <button aria-label="Close pinned notes" className="icon-action" onClick={onClose} title="Close" type="button">
+            <X size={16} />
+          </button>
+        </div>
+        {pinnedNotes.length === 0 ? (
+          <p className="dialog-card__body">No pinned notes yet. Pin a note from the note action menu.</p>
+        ) : (
+          <div className="dashboard-widgets__grid">
+            {pinnedNotes.map((note) => (
+              <article key={note.id} className="dashboard-widget">
+                <div className="dashboard-widget__header">
+                  <h4 className="dashboard-widget__title">{note.title}</h4>
+                  <button
+                    aria-label={`Unpin ${note.title}`}
+                    className="icon-action dashboard-widget__unpin"
+                    onClick={() => onUnpin(note.id)}
+                    title="Unpin"
+                    type="button"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+                <p className="dashboard-widget__summary">{note.summary || note.content.slice(0, 120).replace(/[#*`]/g, "").trim()}</p>
+                <button
+                  className="mini-action dashboard-widget__open"
+                  onClick={() => onOpen(note)}
+                  type="button"
+                >
+                  <ExternalLink size={12} />
+                  Open
+                </button>
+              </article>
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -2079,6 +2141,7 @@ export {
   KeyboardShortcutsDialog,
   TaskTemplateDialog,
   TriagePanel,
+  PinnedNotesDialog,
   QuickCaptureDialog,
   NOTE_TEMPLATES,
 };
