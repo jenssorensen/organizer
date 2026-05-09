@@ -1691,34 +1691,35 @@ function TriagePanel({
   ];
 
   return (
-    <div className="card search-card">
-      <div className="card__header">
-        <div>
-          <p className="eyebrow">Smart triage</p>
-          <h3>Triage views</h3>
+    <div className="dialog-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div aria-labelledby="triage-title" className="dialog-card triage-dialog" role="dialog" aria-modal="true">
+        <div className="dialog-card__header">
+          <div>
+            <p className="eyebrow">Smart triage</p>
+            <h3 id="triage-title">Triage</h3>
+          </div>
+          <button aria-label="Close triage" className="icon-action" onClick={onClose} type="button">
+            <X size={16} />
+          </button>
         </div>
-        <button className="icon-action" onClick={onClose} type="button">
-          <PanelRightClose size={14} />
-        </button>
-      </div>
-      <div className="triage-panel__tabs">
-        {views.map((view) => {
-          const Icon = view.icon;
-          return (
-            <button
-              key={view.id}
-              className={`triage-panel__tab ${activeView === view.id ? "is-active" : ""}`}
-              onClick={() => setActiveView(view.id)}
-              type="button"
-            >
-              <Icon size={12} />
-              {view.label}
-              {view.count > 0 ? <span className="triage-panel__tab-count">{view.count}</span> : null}
-            </button>
-          );
-        })}
-      </div>
-      <div className="triage-panel__content">
+        <div className="triage-panel__tabs">
+          {views.map((view) => {
+            const Icon = view.icon;
+            return (
+              <button
+                key={view.id}
+                className={`triage-panel__tab ${activeView === view.id ? "is-active" : ""}`}
+                onClick={() => setActiveView(view.id)}
+                type="button"
+              >
+                <Icon size={12} />
+                {view.label}
+                {view.count > 0 ? <span className="triage-panel__tab-count">{view.count}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+        <div className="triage-panel__content">
         {activeView === "today" ? (
           dueTodayTodos.length === 0 ? (
             <p className="triage-panel__empty">No tasks due today. Great job!</p>
@@ -1787,6 +1788,7 @@ function TriagePanel({
             ))
           )
         )}
+        </div>
       </div>
     </div>
   );

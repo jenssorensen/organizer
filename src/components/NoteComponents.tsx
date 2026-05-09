@@ -3031,48 +3031,47 @@ export function TrashPanel({
   onPurgeAll: () => void;
 }) {
   return (
-    <div className="trash-panel">
-      <div className="trash-panel__header">
-        <div>
-          <p className="eyebrow">Deleted notes</p>
-          <h4>Trash</h4>
+    <div className="dialog-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div aria-labelledby="trash-title" className="dialog-card trash-dialog" role="dialog" aria-modal="true">
+        <div className="dialog-card__header">
+          <div>
+            <p className="eyebrow">Deleted notes</p>
+            <h3 id="trash-title">Trash{entries.length > 0 ? ` (${entries.length})` : ""}</h3>
+          </div>
+          <div className="trash-panel__header-actions">
+            {entries.length > 0 ? (
+              <button className="mini-action" onClick={onPurgeAll} type="button">
+                <Trash2 size={14} />
+                Empty trash
+              </button>
+            ) : null}
+            <button aria-label="Close trash" className="icon-action" onClick={onClose} title="Close trash" type="button"><X size={14} /></button>
+          </div>
         </div>
-        <div className="trash-panel__header-actions">
-          {entries.length > 0 ? (
-            <button className="mini-action" onClick={onPurgeAll} type="button">
-              <Trash2 size={14} />
-              Empty trash
-            </button>
-          ) : null}
-          <button aria-label="Close trash" className="icon-action" onClick={onClose} title="Close trash" type="button"><X size={14} /></button>
-        </div>
-      </div>
-      {entries.length === 0 ? (
-        <article className="bookmark-empty">
-          <h4>Trash is empty</h4>
-          <p>Deleted notes will appear here for recovery.</p>
-        </article>
-      ) : (
-        <div className="trash-panel__list">
-          {entries.map((entry) => {
-            const deletedLabel = `Deleted ${new Date(entry.deletedAt).toLocaleString()}`;
-            const descriptionLabel = `${entry.sourcePath} · ${deletedLabel}`;
+        {entries.length === 0 ? (
+          <p className="dialog-card__body">Trash is empty. Deleted notes will appear here for recovery.</p>
+        ) : (
+          <div className="trash-panel__list">
+            {entries.map((entry) => {
+              const deletedLabel = `Deleted ${new Date(entry.deletedAt).toLocaleString()}`;
+              const descriptionLabel = `${entry.sourcePath} · ${deletedLabel}`;
 
-            return (
-              <div className="trash-panel__entry" key={entry.id}>
-                <div className="trash-panel__entry-info">
-                  <strong className="trash-panel__entry-title" title={entry.title}>{entry.title}</strong>
-                  <span className="muted trash-panel__entry-description" title={descriptionLabel}>{descriptionLabel}</span>
+              return (
+                <div className="trash-panel__entry" key={entry.id}>
+                  <div className="trash-panel__entry-info">
+                    <strong className="trash-panel__entry-title" title={entry.title}>{entry.title}</strong>
+                    <span className="muted trash-panel__entry-description" title={descriptionLabel}>{descriptionLabel}</span>
+                  </div>
+                  <div className="trash-panel__entry-actions">
+                    <button className="mini-action" onClick={() => onRestore(entry.id)} type="button">Restore</button>
+                    <button className="mini-action" onClick={() => onPurge(entry.id)} type="button">Delete forever</button>
+                  </div>
                 </div>
-                <div className="trash-panel__entry-actions">
-                  <button className="mini-action" onClick={() => onRestore(entry.id)} type="button">Restore</button>
-                  <button className="mini-action" onClick={() => onPurge(entry.id)} type="button">Delete forever</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
