@@ -6631,11 +6631,18 @@ button.note-breadcrumbs__item:hover {
 
 /* ── Triage panel ────────────────────────────────────────────────────────── */
 
+.triage-dialog.dialog-card {
+  width: min(640px, 100%);
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+}
+
 .triage-panel__tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 0 20px 18px;
+  padding: 16px 0 4px;
 }
 
 .triage-panel__tab {
@@ -6687,7 +6694,10 @@ button.note-breadcrumbs__item:hover {
 .triage-panel__content {
   display: grid;
   gap: 10px;
-  padding: 0 20px 20px;
+  padding: 8px 0 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .triage-panel__empty {
@@ -7220,15 +7230,21 @@ button.note-breadcrumbs__item:hover {
 
 /* === Trash Panel === */
 
-.trash-panel {
-  padding: 24px;
+.trash-dialog.dialog-card {
+  width: min(600px, 100%);
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
 }
 
-.trash-panel__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 16px;
+.trash-panel__empty {
+  margin: 0;
+  padding: 18px 16px;
+  border: 1px dashed color-mix(in srgb, var(--border) 90%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--panel) 76%, transparent);
+  color: var(--muted);
+  text-align: center;
 }
 
 .trash-panel__header-actions {
@@ -7240,6 +7256,10 @@ button.note-breadcrumbs__item:hover {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  margin-top: 16px;
 }
 
 .trash-panel__entry {

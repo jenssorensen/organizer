@@ -1691,102 +1691,104 @@ function TriagePanel({
   ];
 
   return (
-    <div className="card search-card">
-      <div className="card__header">
-        <div>
-          <p className="eyebrow">Smart triage</p>
-          <h3>Triage views</h3>
+    <div className="dialog-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div aria-labelledby="triage-dialog-title" className="dialog-card triage-dialog" role="dialog">
+        <div className="dialog-card__header">
+          <div>
+            <p className="eyebrow">Smart triage</p>
+            <h3 id="triage-dialog-title">Triage</h3>
+          </div>
+          <button aria-label="Close triage" className="icon-action" onClick={onClose} title="Close" type="button">
+            <X size={16} />
+          </button>
         </div>
-        <button className="icon-action" onClick={onClose} type="button">
-          <PanelRightClose size={14} />
-        </button>
-      </div>
-      <div className="triage-panel__tabs">
-        {views.map((view) => {
-          const Icon = view.icon;
-          return (
-            <button
-              key={view.id}
-              className={`triage-panel__tab ${activeView === view.id ? "is-active" : ""}`}
-              onClick={() => setActiveView(view.id)}
-              type="button"
-            >
-              <Icon size={12} />
-              {view.label}
-              {view.count > 0 ? <span className="triage-panel__tab-count">{view.count}</span> : null}
-            </button>
-          );
-        })}
-      </div>
-      <div className="triage-panel__content">
-        {activeView === "today" ? (
-          dueTodayTodos.length === 0 ? (
-            <p className="triage-panel__empty">No tasks due today. Great job!</p>
-          ) : (
-            dueTodayTodos.map((todo) => (
-              <button key={todo.id} className="triage-panel__item" onClick={() => onSelectTodo(todo.id)} type="button">
-                <CheckSquare size={13} />
-                <span className="triage-panel__item-title">{todo.title}</span>
-                {todo.priority !== "medium" ? (
-                  <span className={`triage-panel__item-badge is-${todo.priority}`}>{todo.priority}</span>
-                ) : null}
-              </button>
-            ))
-          )
-        ) : activeView === "this-week" ? (
-          dueThisWeekTodos.length === 0 ? (
-            <p className="triage-panel__empty">No tasks due this week.</p>
-          ) : (
-            dueThisWeekTodos.map((todo) => (
-              <button key={todo.id} className="triage-panel__item" onClick={() => onSelectTodo(todo.id)} type="button">
-                <CheckSquare size={13} />
-                <span className="triage-panel__item-title">{todo.title}</span>
-                <span className="triage-panel__item-date">{todo.expectedCompletionDate?.slice(0, 10)}</span>
-              </button>
-            ))
-          )
-        ) : activeView === "waiting" ? (
-          waitingTodos.length === 0 ? (
-            <p className="triage-panel__empty">No waiting / paused tasks.</p>
-          ) : (
-            waitingTodos.map((todo) => (
-              <button key={todo.id} className="triage-panel__item" onClick={() => onSelectTodo(todo.id)} type="button">
-                <Clock size={13} />
-                <span className="triage-panel__item-title">{todo.title}</span>
-                <span className="triage-panel__item-date">{todo.updatedAt.slice(0, 10)}</span>
-              </button>
-            ))
-          )
-        ) : activeView === "stale-notes" ? (
-          staleNotes.length === 0 ? (
-            <p className="triage-panel__empty">No stale notes (all modified within 30 days).</p>
-          ) : (
-            staleNotes.map((note) => (
-              <button key={note.id} className="triage-panel__item" onClick={() => onOpenNote(note)} type="button">
-                <FileText size={13} />
-                <span className="triage-panel__item-title">{note.title}</span>
-                <span className="triage-panel__item-date">{note.updatedAt.slice(0, 10)}</span>
-              </button>
-            ))
-          )
-        ) : (
-          unsortedBookmarks.length === 0 ? (
-            <p className="triage-panel__empty">All bookmarks are tagged and organised.</p>
-          ) : (
-            unsortedBookmarks.map((bm) => (
+        <div className="triage-panel__tabs">
+          {views.map((view) => {
+            const Icon = view.icon;
+            return (
               <button
-                key={bm.id}
-                className="triage-panel__item"
-                onClick={() => window.open(bm.url, "_blank", "noopener,noreferrer")}
+                key={view.id}
+                className={`triage-panel__tab ${activeView === view.id ? "is-active" : ""}`}
+                onClick={() => setActiveView(view.id)}
                 type="button"
               >
-                <Filter size={13} />
-                <span className="triage-panel__item-title">{bm.title}</span>
-                <span className="triage-panel__item-date">{bm.domain}</span>
+                <Icon size={12} />
+                {view.label}
+                {view.count > 0 ? <span className="triage-panel__tab-count">{view.count}</span> : null}
               </button>
-            ))
-          )
-        )}
+            );
+          })}
+        </div>
+        <div className="triage-panel__content">
+          {activeView === "today" ? (
+            dueTodayTodos.length === 0 ? (
+              <p className="triage-panel__empty">No tasks due today. Great job!</p>
+            ) : (
+              dueTodayTodos.map((todo) => (
+                <button key={todo.id} className="triage-panel__item" onClick={() => onSelectTodo(todo.id)} type="button">
+                  <CheckSquare size={13} />
+                  <span className="triage-panel__item-title">{todo.title}</span>
+                  {todo.priority !== "medium" ? (
+                    <span className={`triage-panel__item-badge is-${todo.priority}`}>{todo.priority}</span>
+                  ) : null}
+                </button>
+              ))
+            )
+          ) : activeView === "this-week" ? (
+            dueThisWeekTodos.length === 0 ? (
+              <p className="triage-panel__empty">No tasks due this week.</p>
+            ) : (
+              dueThisWeekTodos.map((todo) => (
+                <button key={todo.id} className="triage-panel__item" onClick={() => onSelectTodo(todo.id)} type="button">
+                  <CheckSquare size={13} />
+                  <span className="triage-panel__item-title">{todo.title}</span>
+                  <span className="triage-panel__item-date">{todo.expectedCompletionDate?.slice(0, 10)}</span>
+                </button>
+              ))
+            )
+          ) : activeView === "waiting" ? (
+            waitingTodos.length === 0 ? (
+              <p className="triage-panel__empty">No waiting / paused tasks.</p>
+            ) : (
+              waitingTodos.map((todo) => (
+                <button key={todo.id} className="triage-panel__item" onClick={() => onSelectTodo(todo.id)} type="button">
+                  <Clock size={13} />
+                  <span className="triage-panel__item-title">{todo.title}</span>
+                  <span className="triage-panel__item-date">{todo.updatedAt.slice(0, 10)}</span>
+                </button>
+              ))
+            )
+          ) : activeView === "stale-notes" ? (
+            staleNotes.length === 0 ? (
+              <p className="triage-panel__empty">No stale notes (all modified within 30 days).</p>
+            ) : (
+              staleNotes.map((note) => (
+                <button key={note.id} className="triage-panel__item" onClick={() => onOpenNote(note)} type="button">
+                  <FileText size={13} />
+                  <span className="triage-panel__item-title">{note.title}</span>
+                  <span className="triage-panel__item-date">{note.updatedAt.slice(0, 10)}</span>
+                </button>
+              ))
+            )
+          ) : (
+            unsortedBookmarks.length === 0 ? (
+              <p className="triage-panel__empty">All bookmarks are tagged and organised.</p>
+            ) : (
+              unsortedBookmarks.map((bm) => (
+                <button
+                  key={bm.id}
+                  className="triage-panel__item"
+                  onClick={() => window.open(bm.url, "_blank", "noopener,noreferrer")}
+                  type="button"
+                >
+                  <Filter size={13} />
+                  <span className="triage-panel__item-title">{bm.title}</span>
+                  <span className="triage-panel__item-date">{bm.domain}</span>
+                </button>
+              ))
+            )
+          )}
+        </div>
       </div>
     </div>
   );
