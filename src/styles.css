@@ -2994,6 +2994,14 @@ button.note-breadcrumbs__item:hover {
   opacity: 0.6;
 }
 
+.note-folder-overview__section--overview.is-collapsed ~ .note-folder-overview__section--preview .note-folder-overview__no-preview {
+  display: none;
+}
+
+.note-folder-overview__section--notes.is-collapsed ~ .note-folder-overview__section--preview .note-folder-overview__no-preview {
+  display: none;
+}
+
 
 
 .note-folder-overview__section-toolbar {
@@ -6230,8 +6238,12 @@ button.note-breadcrumbs__item:hover {
 
 /* ── Dashboard widgets ────────────────────────────────────────────────────── */
 
-.dashboard-widgets-card {
-  margin-top: 0;
+.pinned-dialog.dialog-card {
+  width: min(740px, 100%);
+}
+
+.pinned-dialog .dashboard-widgets__grid {
+  margin-top: 4px;
 }
 
 .dashboard-widgets__grid {
@@ -6641,8 +6653,8 @@ button.note-breadcrumbs__item:hover {
 .triage-panel__tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 16px 0 4px;
+  gap: 8px;
+  padding: 0 0 18px;
 }
 
 .triage-panel__tab {
@@ -6693,8 +6705,8 @@ button.note-breadcrumbs__item:hover {
 
 .triage-panel__content {
   display: grid;
-  gap: 10px;
-  padding: 8px 0 0;
+  gap: 8px;
+  padding: 0;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
@@ -7230,26 +7242,27 @@ button.note-breadcrumbs__item:hover {
 
 /* === Trash Panel === */
 
-.trash-dialog.dialog-card {
-  width: min(600px, 100%);
+.trash-panel.dialog-card {
+  width: min(580px, 100%);
   display: flex;
   flex-direction: column;
   max-height: 80vh;
 }
 
-.trash-panel__empty {
-  margin: 0;
-  padding: 18px 16px;
-  border: 1px dashed color-mix(in srgb, var(--border) 90%, transparent);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--panel) 76%, transparent);
-  color: var(--muted);
-  text-align: center;
+.trash-panel .dialog-card__header {
+  flex-shrink: 0;
 }
 
 .trash-panel__header-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.trash-panel__empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
 }
 
 .trash-panel__list {
@@ -7257,9 +7270,7 @@ button.note-breadcrumbs__item:hover {
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-  margin-top: 16px;
+  padding-top: 4px;
 }
 
 .trash-panel__entry {
@@ -7267,10 +7278,15 @@ button.note-breadcrumbs__item:hover {
   flex-direction: column;
   align-items: stretch;
   padding: 12px 14px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: rgba(136, 167, 209, 0.04);
+  border: 1px solid rgba(136, 167, 209, 0.12);
+  border-radius: 12px;
   gap: 10px;
+  transition: border-color 0.14s;
+}
+
+.trash-panel__entry:hover {
+  border-color: rgba(120, 230, 198, 0.2);
 }
 
 .trash-panel__entry-info {
@@ -7290,7 +7306,12 @@ button.note-breadcrumbs__item:hover {
 }
 
 .trash-panel__entry-info strong {
-  font-size: 13px;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.trash-panel__entry-description {
+  font-size: 0.78rem;
 }
 
 .trash-panel__entry-actions {
@@ -7300,9 +7321,9 @@ button.note-breadcrumbs__item:hover {
 }
 
 .trash-panel__entry-actions .mini-action {
-  min-height: 32px;
-  padding: 6px 10px;
-  font-size: 0.84rem;
+  min-height: 30px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
   border-radius: 10px;
 }
 
