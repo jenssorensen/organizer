@@ -29,6 +29,7 @@ import swift from "react-syntax-highlighter/dist/esm/languages/prism/swift";
 import yaml from "react-syntax-highlighter/dist/esm/languages/prism/yaml";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Bold, Check, CheckSquare2, Copy, Eye, EyeOff, IndentDecrease, Italic, Link2, List, Minus, Pilcrow, Plus, Save, Sigma, TableOfContents, Trash2, SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
+import { apiFetch as fetch } from "../apiFetch";
 import { getMarkdownLinkAttributes } from "../markdownLinks";
 import {
   clampEditorSplitPercent,

@@ -949,7 +949,6 @@ function NoteFolderOverviewPanel({
   onSetSectionColor,
   onSelectFolder,
   onSelectNote,
-  onStartEditingNote,
   onRenameNote,
   onOpenNoteHistory,
   onTogglePinnedNote,
@@ -1990,12 +1989,12 @@ function NoteFolderOverviewPanel({
           className={`note-folder-overview__split ${isResizingOverview ? "is-resizing" : ""}`}
           ref={splitRef}
           style={{
-            gridTemplateColumns: (isSectionView ? isOverviewPaneCollapsed : isTreeCollapsed)
+            gridTemplateColumns: (isSectionView ? isNotesCollapsed : isTreeCollapsed)
               ? getCollapsedOverviewColumns()
               : getResizableOverviewColumns(isSectionView ? previewSplitPercent : overviewSplitPercent),
           }}
         >
-          <section className={`note-folder-overview__section note-folder-overview__section--overview ${(isSectionView ? isOverviewPaneCollapsed : isTreeCollapsed) ? "is-collapsed" : ""}`}>
+          <section className={`note-folder-overview__section note-folder-overview__section--overview ${(isSectionView ? isNotesCollapsed : isTreeCollapsed) ? "is-collapsed" : ""}`}>
             {!isSectionView ? (
             <div className="note-folder-overview__overview-block note-folder-overview__overview-block--tree">
               <div className="note-folder-overview__section-toolbar">
@@ -2064,43 +2063,41 @@ function NoteFolderOverviewPanel({
               </div>
               {!isTreeCollapsed ? (
                 <div className="note-folder-overview__tree">
-                  {notesNavigationMode !== "section" ? (
-                    <div className={`tree-folder note-tree-folder ${effectiveActiveSection ? (isNoteDragActive || selectedNodeId === effectiveActiveSection.id) ? "is-selected" : "" : isRoot ? "is-selected" : ""}`}>
-                      <div className="tree-folder__title">
-                        <span
-                          className="tree-folder__label note-tree-folder__label"
-                          onClick={() => {
+                  <div className={`tree-folder note-tree-folder ${effectiveActiveSection ? (isNoteDragActive || selectedNodeId === effectiveActiveSection.id) ? "is-selected" : "" : isRoot ? "is-selected" : ""}`}>
+                    <div className="tree-folder__title">
+                      <span
+                        className="tree-folder__label note-tree-folder__label"
+                        onClick={() => {
+                          if (effectiveActiveSection) {
+                            onSelectSection(effectiveActiveSection.id);
+                            return;
+                          }
+
+                          onSelectFolder(null);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
                             if (effectiveActiveSection) {
                               onSelectSection(effectiveActiveSection.id);
                               return;
                             }
 
                             onSelectFolder(null);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              if (effectiveActiveSection) {
-                                onSelectSection(effectiveActiveSection.id);
-                                return;
-                              }
-
-                              onSelectFolder(null);
-                            }
-                          }}
-                          role="button"
-                          tabIndex={0}
-                        >
-                          <span aria-hidden="true" className="folder-toggle folder-toggle--spacer" />
-                          <Folder size={16} />
-                          <span>
-                            {effectiveActiveSection ? effectiveActiveSection.title : rootNodeLabel}{" "}
-                            <span className="tree-folder__count">({effectiveActiveSection ? effectiveActiveSection.noteCount : countNotesInTree(sortedNavigationTreeNodes)})</span>
-                          </span>
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <span aria-hidden="true" className="folder-toggle folder-toggle--spacer" />
+                        <Folder size={16} />
+                        <span>
+                          {effectiveActiveSection ? effectiveActiveSection.title : rootNodeLabel}{" "}
+                          <span className="tree-folder__count">({effectiveActiveSection ? effectiveActiveSection.noteCount : countNotesInTree(sortedNavigationTreeNodes)})</span>
                         </span>
-                      </div>
+                      </span>
                     </div>
-                  ) : null}
+                  </div>
                   {sortedNavigationTreeNodes.length > 0 ? (
                     <div className="tree-folder__children">
                       {visibleNavigationTreeNodes.map((folderNode, index) => (
@@ -2137,7 +2134,7 @@ function NoteFolderOverviewPanel({
                       ) : null}
                     </div>
                   ) : (
-                    <p className="muted">{notesNavigationMode === "section" ? "No folders in this section yet." : activeSection ? "No notes or subfolders in this section yet." : "No child folders yet."}</p>
+                    <p className="muted">{activeSection ? "No notes or subfolders in this section yet." : "No child folders yet."}</p>
                   )}
                 </div>
               ) : null}
@@ -2502,7 +2499,7 @@ function NoteFolderOverviewPanel({
             </>
           ) : (
             <>
-              {!isOverviewPaneCollapsed ? (
+              {!isNotesCollapsed ? (
                 <button
                   aria-label="Resize notes preview panes"
                   aria-orientation="vertical"
@@ -3032,24 +3029,24 @@ export function TrashPanel({
 }) {
   return (
     <div className="dialog-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div aria-labelledby="trash-title" className="dialog-card trash-dialog" role="dialog" aria-modal="true">
+      <div aria-labelledby="trash-panel-title" className="dialog-card trash-dialog trash-panel" role="dialog" aria-modal="true">
         <div className="dialog-card__header">
           <div>
             <p className="eyebrow">Deleted notes</p>
-            <h3 id="trash-title">Trash{entries.length > 0 ? ` (${entries.length})` : ""}</h3>
+            <h3 id="trash-panel-title">Trash {entries.length > 0 ? `(${entries.length})` : ""}</h3>
           </div>
-          <div className="trash-dialog__header-actions">
+          <div className="trash-dialog__header-actions trash-panel__header-actions">
             {entries.length > 0 ? (
               <button className="mini-action" onClick={onPurgeAll} type="button">
-                <Trash2 size={14} />
+                <Trash2 size={13} />
                 Empty trash
               </button>
             ) : null}
-            <button aria-label="Close trash" className="icon-action" onClick={onClose} title="Close trash" type="button"><X size={14} /></button>
+            <button aria-label="Close trash" className="icon-action" onClick={onClose} title="Close" type="button"><X size={14} /></button>
           </div>
         </div>
         {entries.length === 0 ? (
-          <p className="dialog-card__body">Trash is empty. Deleted notes will appear here for recovery.</p>
+          <p className="dialog-card__body trash-panel__empty">Trash is empty — deleted notes will appear here for recovery.</p>
         ) : (
           <div className="trash-panel__list">
             {entries.map((entry) => {
