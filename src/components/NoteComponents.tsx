@@ -995,7 +995,6 @@ function NoteFolderOverviewPanel({
   onSetSectionColor?: (sectionId: string, accentColor: string) => void;
   onSelectFolder: (nodeId: string | null) => void;
   onSelectNote: (nodeId: string | null) => void;
-  onStartEditingNote?: (note: Note, nodeId: string) => void;
   onRenameNote?: (note: Note, nextFileName: string) => Promise<void> | void;
   onOpenNoteHistory?: (note: Note) => void;
   onTogglePinnedNote?: (noteId: string, nextPinned: boolean) => void;

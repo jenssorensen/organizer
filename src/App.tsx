@@ -2476,7 +2476,6 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       onSelectSection={(nodeId) => navigateNoteSelection(nodeId === GENERAL_NOTE_SECTION_ID ? ROOT_NOTE_NODE_ID : nodeId, "notes")}
       onSetSectionColor={section === "notes" ? handleSetNoteSectionColor : undefined}
       onSelectFolder={navigateNoteSelection}
-      onStartEditingNote={section === "notes" ? handleStartEditingNote : undefined}
       onRenameNote={section === "notes" ? handleRenameNoteFile : undefined}
       onOpenNoteHistory={(note) => {
         setVersionHistoryNote(note);
