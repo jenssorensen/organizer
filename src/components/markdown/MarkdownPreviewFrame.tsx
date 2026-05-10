@@ -239,6 +239,8 @@ export function SandboxedPreviewFrame({
     }
 
     let resizeObserver: ResizeObserver | null = null;
+    let mutationObserver: MutationObserver | null = null;
+    let cleanupImageListeners: (() => void) | null = null;
 
     const syncFrameHeight = () => {
       const frameDocument = iframe.contentDocument;
@@ -256,7 +258,16 @@ export function SandboxedPreviewFrame({
       iframe.style.height = `${nextHeight}px`;
     };
 
-    const handleLoad = () => {
+    const disconnectObservers = () => {
+      resizeObserver?.disconnect();
+      resizeObserver = null;
+      mutationObserver?.disconnect();
+      mutationObserver = null;
+      cleanupImageListeners?.();
+      cleanupImageListeners = null;
+    };
+
+    const observeFrameContent = () => {
       const frameDocument = iframe.contentDocument;
       if (!frameDocument) {
         return;
@@ -266,21 +277,57 @@ export function SandboxedPreviewFrame({
         cloneStylesIntoFrame(frameDocument);
       }
 
+      disconnectObservers();
       syncFrameHeight();
 
+      const scheduleHeightSync = () => {
+        window.requestAnimationFrame(syncFrameHeight);
+      };
+
       if (typeof ResizeObserver !== "undefined") {
-        const resizeTarget = frameDocument.getElementById("organizer-sandbox-root") ?? frameDocument.body;
+        const resizeTargets = [
+          frameDocument.getElementById("organizer-sandbox-root"),
+          frameDocument.body,
+          frameDocument.documentElement,
+        ].filter((target): target is HTMLElement => Boolean(target));
         resizeObserver = new ResizeObserver(() => syncFrameHeight());
-        resizeObserver.observe(resizeTarget);
+        for (const resizeTarget of resizeTargets) {
+          resizeObserver.observe(resizeTarget);
+        }
+      }
+
+      if (typeof MutationObserver !== "undefined") {
+        mutationObserver = new MutationObserver(() => scheduleHeightSync());
+        mutationObserver.observe(frameDocument.documentElement, {
+          attributes: true,
+          characterData: true,
+          childList: true,
+          subtree: true,
+        });
+      }
+
+      const pendingImages = Array.from(frameDocument.images).filter((image) => !image.complete);
+      if (pendingImages.length > 0) {
+        const handleImageLoad = () => scheduleHeightSync();
+        for (const image of pendingImages) {
+          image.addEventListener("load", handleImageLoad);
+          image.addEventListener("error", handleImageLoad);
+        }
+        cleanupImageListeners = () => {
+          for (const image of pendingImages) {
+            image.removeEventListener("load", handleImageLoad);
+            image.removeEventListener("error", handleImageLoad);
+          }
+        };
       }
     };
 
-    iframe.addEventListener("load", handleLoad);
-    window.requestAnimationFrame(syncFrameHeight);
+    iframe.addEventListener("load", observeFrameContent);
+    window.requestAnimationFrame(observeFrameContent);
 
     return () => {
-      iframe.removeEventListener("load", handleLoad);
-      resizeObserver?.disconnect();
+      iframe.removeEventListener("load", observeFrameContent);
+      disconnectObservers();
     };
   }, [frameSrc, portalRoot, portalContent]);
 
