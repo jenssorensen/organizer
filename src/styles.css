@@ -1606,6 +1606,13 @@ a {
   backdrop-filter: blur(10px);
 }
 
+.mermaid-diagram__action-button {
+  min-height: 30px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  backdrop-filter: blur(10px);
+}
+
 .mermaid-diagram__copy-menu {
   min-width: 110px;
   padding: 6px;
@@ -1671,6 +1678,94 @@ a {
 .mermaid-diagram svg {
   display: block;
   max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.mermaid-diagram__viewer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(6, 11, 20, 0.76);
+  backdrop-filter: blur(8px);
+}
+
+.mermaid-diagram__viewer {
+  width: min(1120px, 100%);
+  max-height: min(88vh, 920px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid rgba(136, 167, 209, 0.18);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--bg-strong) 96%, transparent);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.mermaid-diagram__viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mermaid-diagram__viewer-header h3 {
+  margin: 0;
+}
+
+.mermaid-diagram__viewer-header .eyebrow {
+  margin-bottom: 4px;
+}
+
+.mermaid-diagram__viewer-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mermaid-diagram__viewer-zoom-value {
+  min-width: 3.8rem;
+  text-align: center;
+  font: 600 0.92rem/1 var(--font-mono);
+  color: var(--text);
+}
+
+.mermaid-diagram__viewer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--markdown-border);
+  border-radius: 16px;
+  background: var(--markdown-table-alt);
+  cursor: default;
+}
+
+.mermaid-diagram__viewer-body.is-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.mermaid-diagram__viewer-body.is-panning * {
+  cursor: grabbing;
+}
+
+.mermaid-diagram__viewer-canvas {
+  min-width: 100%;
+  transition: width 120ms ease;
+}
+
+.mermaid-diagram__viewer-canvas svg {
+  display: block;
+  width: 100%;
+  max-width: none;
   height: auto;
   margin: 0 auto;
 }

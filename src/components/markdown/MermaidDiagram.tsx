@@ -1,7 +1,12 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import mermaid from "mermaid";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Maximize2, Minus, Plus, X } from "lucide-react";
+
+const DEFAULT_ZOOM_PERCENT = 160;
+const WHEEL_ZOOM_STEP = 10;
+const MIN_ZOOM_PERCENT = 100;
+const MAX_ZOOM_PERCENT = 300;
 
 function hashString(value: string) {
   let hash = 0;
@@ -18,8 +23,11 @@ export function MermaidDiagram({ chart, theme }: { chart: string; theme: "dark" 
   const [svg, setSvg] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
+  const [isZoomViewerOpen, setIsZoomViewerOpen] = useState(false);
+  const [isPanningViewer, setIsPanningViewer] = useState(false);
   const [pngSizeMenuOpen, setPngSizeMenuOpen] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<"idle" | "text" | "image" | "svg">("idle");
+  const [zoomPercent, setZoomPercent] = useState(DEFAULT_ZOOM_PERCENT);
   const [copyMenuPosition, setCopyMenuPosition] = useState({ top: 0, left: 0 });
   const [pngSubmenuPosition, setPngSubmenuPosition] = useState({ top: 0, left: 0 });
   const copyTriggerRef = useRef<HTMLButtonElement>(null);
@@ -27,6 +35,13 @@ export function MermaidDiagram({ chart, theme }: { chart: string; theme: "dark" 
   const pngMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const pngSubmenuRef = useRef<HTMLDivElement>(null);
   const pngSubmenuCloseTimeoutRef = useRef<number | null>(null);
+  const zoomViewerBodyRef = useRef<HTMLDivElement>(null);
+  const panSessionRef = useRef<{
+    startClientX: number;
+    startClientY: number;
+    startScrollLeft: number;
+    startScrollTop: number;
+  } | null>(null);
 
   function getFloatingMenuPosition(anchor: HTMLElement, xOffset = 0, yOffset = 6) {
     const rect = anchor.getBoundingClientRect();
@@ -173,6 +188,84 @@ export function MermaidDiagram({ chart, theme }: { chart: string; theme: "dark" 
     }
   }
 
+  function openZoomViewer() {
+    setZoomPercent(DEFAULT_ZOOM_PERCENT);
+    setCopyMenuOpen(false);
+    setPngSizeMenuOpen(false);
+    setIsZoomViewerOpen(true);
+  }
+
+  function closeZoomViewer() {
+    setIsZoomViewerOpen(false);
+    setIsPanningViewer(false);
+    panSessionRef.current = null;
+  }
+
+  function setZoomPercentAroundPoint(nextZoomPercent: number, anchorClientX?: number, anchorClientY?: number) {
+    const boundedZoomPercent = Math.min(MAX_ZOOM_PERCENT, Math.max(MIN_ZOOM_PERCENT, nextZoomPercent));
+    const zoomViewerBody = zoomViewerBodyRef.current;
+
+    if (boundedZoomPercent === zoomPercent) {
+      return;
+    }
+
+    if (zoomViewerBody) {
+      const rect = zoomViewerBody.getBoundingClientRect();
+      const viewportX = anchorClientX === undefined ? zoomViewerBody.clientWidth / 2 : anchorClientX - rect.left;
+      const viewportY = anchorClientY === undefined ? zoomViewerBody.clientHeight / 2 : anchorClientY - rect.top;
+      const contentX = zoomViewerBody.scrollLeft + viewportX;
+      const contentY = zoomViewerBody.scrollTop + viewportY;
+      const zoomRatio = boundedZoomPercent / zoomPercent;
+
+      setZoomPercent(boundedZoomPercent);
+      window.requestAnimationFrame(() => {
+        const viewerBody = zoomViewerBodyRef.current;
+        if (!viewerBody) {
+          return;
+        }
+        viewerBody.scrollLeft = Math.max(0, contentX * zoomRatio - viewportX);
+        viewerBody.scrollTop = Math.max(0, contentY * zoomRatio - viewportY);
+      });
+      return;
+    }
+
+    setZoomPercent(boundedZoomPercent);
+  }
+
+  function handleZoomOut() {
+    setZoomPercentAroundPoint(zoomPercent - 20);
+  }
+
+  function handleZoomIn() {
+    setZoomPercentAroundPoint(zoomPercent + 20);
+  }
+
+  function handleZoomReset() {
+    setZoomPercentAroundPoint(DEFAULT_ZOOM_PERCENT);
+  }
+
+  function handleViewerWheel(event: React.WheelEvent<HTMLDivElement>) {
+    event.preventDefault();
+
+    const zoomDelta = event.deltaY < 0 ? WHEEL_ZOOM_STEP : -WHEEL_ZOOM_STEP;
+    setZoomPercentAroundPoint(zoomPercent + zoomDelta, event.clientX, event.clientY);
+  }
+
+  function handleViewerMouseDown(event: React.MouseEvent<HTMLDivElement>) {
+    if (event.button !== 0 || !event.ctrlKey) {
+      return;
+    }
+
+    event.preventDefault();
+    panSessionRef.current = {
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startScrollLeft: event.currentTarget.scrollLeft,
+      startScrollTop: event.currentTarget.scrollTop,
+    };
+    setIsPanningViewer(true);
+  }
+
   useEffect(() => {
     if (!copyMenuOpen) {
       return;
@@ -195,6 +288,66 @@ export function MermaidDiagram({ chart, theme }: { chart: string; theme: "dark" 
       window.removeEventListener("scroll", updateCopyMenuPosition, true);
     };
   }, [copyMenuOpen]);
+
+  useEffect(() => {
+    if (!isZoomViewerOpen) {
+      return;
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsZoomViewerOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [isZoomViewerOpen]);
+
+  useEffect(() => {
+    if (isZoomViewerOpen) {
+      return;
+    }
+
+    setIsPanningViewer(false);
+    panSessionRef.current = null;
+  }, [isZoomViewerOpen]);
+
+  useEffect(() => {
+    if (!isPanningViewer) {
+      return;
+    }
+
+    function handleWindowMouseMove(event: MouseEvent) {
+      const panSession = panSessionRef.current;
+      const viewerBody = zoomViewerBodyRef.current;
+      if (!panSession || !viewerBody) {
+        return;
+      }
+
+      const deltaX = event.clientX - panSession.startClientX;
+      const deltaY = event.clientY - panSession.startClientY;
+      viewerBody.scrollLeft = panSession.startScrollLeft - deltaX;
+      viewerBody.scrollTop = panSession.startScrollTop - deltaY;
+    }
+
+    function finishViewerPan() {
+      panSessionRef.current = null;
+      setIsPanningViewer(false);
+    }
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", finishViewerPan);
+    window.addEventListener("blur", finishViewerPan);
+
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", finishViewerPan);
+      window.removeEventListener("blur", finishViewerPan);
+    };
+  }, [isPanningViewer]);
 
   useEffect(() => {
     return () => {
@@ -304,9 +457,19 @@ export function MermaidDiagram({ chart, theme }: { chart: string; theme: "dark" 
       <div className="mermaid-diagram">
         <div className="mermaid-diagram__copy-actions">
           <button
+            aria-label="Zoom diagram"
+            className="mini-action mermaid-diagram__action-button"
+            onClick={openZoomViewer}
+            title="Zoom"
+            type="button"
+          >
+            <Maximize2 size={14} />
+            Zoom
+          </button>
+          <button
             ref={copyTriggerRef}
             aria-label={copyFeedback === "idle" ? "Copy diagram" : copyFeedback === "text" ? "Copied text" : copyFeedback === "image" ? "Copied image" : "Saved SVG"}
-            className="mini-action mermaid-diagram__copy-trigger"
+            className="mini-action mermaid-diagram__action-button mermaid-diagram__copy-trigger"
             onClick={() => {
               setCopyMenuOpen((current) => {
                 const next = !current;
@@ -365,6 +528,58 @@ export function MermaidDiagram({ chart, theme }: { chart: string; theme: "dark" 
           <button className="mermaid-diagram__copy-option" onClick={() => void copyDiagramPng("medium")} role="menuitem" type="button">Medium</button>
           <button className="mermaid-diagram__copy-option" onClick={() => void copyDiagramPng("large")} role="menuitem" type="button">Large</button>
           <button className="mermaid-diagram__copy-option" onClick={() => void copyDiagramPng("xlarge")} role="menuitem" type="button">X-large</button>
+        </div>,
+        document.body,
+      ) : null}
+      {isZoomViewerOpen && typeof document !== "undefined" ? createPortal(
+        <div
+          className="mermaid-diagram__viewer-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeZoomViewer();
+            }
+          }}
+          role="presentation"
+        >
+          <div
+            aria-labelledby={`${renderId}-zoom-title`}
+            aria-modal="true"
+            className="mermaid-diagram__viewer"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="mermaid-diagram__viewer-header">
+              <div>
+                <p className="eyebrow">Diagram viewer</p>
+                <h3 id={`${renderId}-zoom-title`}>Zoom diagram</h3>
+              </div>
+              <div className="mermaid-diagram__viewer-controls">
+                <button aria-label="Zoom out" className="icon-action" onClick={handleZoomOut} type="button">
+                  <Minus size={16} />
+                </button>
+                <span className="mermaid-diagram__viewer-zoom-value">{zoomPercent}%</span>
+                <button aria-label="Zoom in" className="icon-action" onClick={handleZoomIn} type="button">
+                  <Plus size={16} />
+                </button>
+                <button className="mini-action" onClick={handleZoomReset} type="button">Reset</button>
+                <button aria-label="Close zoom viewer" className="icon-action" onClick={closeZoomViewer} type="button">
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+            <div
+              className={`mermaid-diagram__viewer-body ${isPanningViewer ? "is-panning" : ""}`.trim()}
+              onMouseDown={handleViewerMouseDown}
+              onWheel={handleViewerWheel}
+              ref={zoomViewerBodyRef}
+            >
+              <div
+                className="mermaid-diagram__viewer-canvas"
+                dangerouslySetInnerHTML={{ __html: svg }}
+                style={{ width: `${zoomPercent}%` }}
+              />
+            </div>
+          </div>
         </div>,
         document.body,
       ) : null}
