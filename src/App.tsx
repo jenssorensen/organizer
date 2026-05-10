@@ -4907,11 +4907,6 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                     Get started by selecting a folder that contains your documents, markdown files, or images.
                     This folder will be used as the source of truth for your notes.
                   </p>
-                  {shouldUseManualPaths ? (
-                    <p className="getting-started__hint">
-                      On Windows in the browser build, enter the full folder path manually.
-                    </p>
-                  ) : null}
                   <div className="getting-started__form">
                     <input
                       className="getting-started__input"

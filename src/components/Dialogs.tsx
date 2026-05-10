@@ -1443,11 +1443,6 @@ function MetaDataSetupDialog({
           Choose a folder where Organizer will store your metadata (bookmarks, todos, starred notes, etc.).
           A subfolder called <code>organizer_meta_data</code> will be created inside your chosen location.
         </p>
-        {shouldUseManualPaths ? (
-          <p className="meta-data-setup__hint">
-            On Windows in the browser build, enter the full folder path manually.
-          </p>
-        ) : null}
 
         <div className="meta-data-setup__actions">
           {!shouldUseManualPaths ? (
