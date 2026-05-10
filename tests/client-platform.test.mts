@@ -13,7 +13,7 @@ test("isWindowsUserAgent detects Windows browsers", () => {
   assert.equal(isWindowsUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"), false);
 });
 
-test("shouldUseManualFolderPaths is enabled for Windows user agents", () => {
+test("shouldUseManualFolderPaths requires manual paths on Windows only", () => {
   assert.equal(shouldUseManualFolderPaths("Mozilla/5.0 (Windows NT 10.0; Win64; x64)"), true);
   assert.equal(shouldUseManualFolderPaths("Mozilla/5.0 (X11; Linux x86_64)"), false);
 });

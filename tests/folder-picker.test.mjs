@@ -44,9 +44,9 @@ test("getFolderPickerCommand uses single-folder Windows picker for metadata sele
   assert.deepEqual(command.args.slice(0, 5), ["-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-EncodedCommand"]);
   const decoded = Buffer.from(command.args[5], "base64").toString("utf16le");
   assert.doesNotMatch(decoded, /`n/);
-  assert.match(decoded, /\n\$shell = New-Object -ComObject Shell\.Application/);
-  assert.match(decoded, /Shell\.Application/);
-  assert.match(decoded, /BrowseForFolder/);
+  assert.match(decoded, /Add-Type -AssemblyName System\.Windows\.Forms/);
+  assert.match(decoded, /New-Object System\.Windows\.Forms\.FolderBrowserDialog/);
+  assert.match(decoded, /SelectedPath/);
   assert.match(decoded, /Select folder for organizer metadata/);
 });
 

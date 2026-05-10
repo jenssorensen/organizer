@@ -87,13 +87,16 @@ function buildWindowsPickerScript(prompt, multiple) {
   const escapedPrompt = escapeForPowerShellSingleQuotedString(prompt);
 
   if (!multiple) {
-    // Single-folder selection via the Windows shell dialog
+    // Single-folder selection via WinForms avoids Shell.Application COM failures.
     return [
       "$ErrorActionPreference = 'Stop'",
-      "$shell = New-Object -ComObject Shell.Application",
-      "$folder = $shell.BrowseForFolder(0, '" + escapedPrompt + "', 0x0040 + 0x0010, 0)",
-      "if ($folder -ne $null -and $folder.Self -ne $null) {",
-      "  Write-Output $folder.Self.Path",
+      "Add-Type -AssemblyName System.Windows.Forms",
+      "$dialog = New-Object System.Windows.Forms.FolderBrowserDialog",
+      "$dialog.Description = '" + escapedPrompt + "'",
+      "$dialog.UseDescriptionForTitle = $true",
+      "$dialog.ShowNewFolderButton = $true",
+      "if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK -and $dialog.SelectedPath) {",
+      "  Write-Output $dialog.SelectedPath",
       "} else {",
       "  exit 1",
       "}",

@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { ArrowUpDown, Check, Clock, Folder, GripVertical, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Plus, Star, Trash2, X } from "lucide-react";
+import { Suspense, lazy, useState, useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { ArrowUpDown, Check, Clock, Folder, GripVertical, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Star, Trash2, X } from "lucide-react";
 import type { Note, NoteTreeNode, RecentDocumentEntry } from "../types";
 import type { NoteSectionSummary } from "../noteSections";
 import { sortFolderNotes, type FolderNotesSortMode } from "../noteSorting";
@@ -14,6 +14,11 @@ import {
   countNotesInTree,
 } from "../noteFormatting";
 import { getRecentActivityTimestamp, getRecentPrimaryActivity } from "../recentDocuments";
+import { DailyNoteNavigator, TrashPanel, WorkspaceSwitcher } from "./notes/NotePanels";
+import { GraphView } from "./notes/NoteGraphView";
+import { FullTextSearchResults, NoteLinkAutocomplete, SmartFoldersList } from "./notes/NoteSearchUtilities";
+
+const MarkdownContent = lazy(() => import("./markdown/MarkdownContent").then((module) => ({ default: module.MarkdownContent })));
 
 type SectionsSortMode = "custom" | "title" | "notes" | "folders";
 type NavigationSortMode = "recent" | "views" | "created" | "modified" | "name-asc" | "name-desc";
@@ -166,7 +171,6 @@ function sortNavigationNodes(
 
   return sortNodeList(nodes);
 }
-import { MarkdownContent } from "./MarkdownComponents";
 
 const STORED_NOTES_OVERVIEW_SPLIT_KEY = "organizer:notes-overview-split:v3";
 const STORED_NOTES_PREVIEW_SPLIT_KEY = "organizer:notes-preview-split:v2";
@@ -949,7 +953,6 @@ function NoteFolderOverviewPanel({
   onSetSectionColor,
   onSelectFolder,
   onSelectNote,
-  onStartEditingNote,
   onRenameNote,
   onOpenNoteHistory,
   onTogglePinnedNote,
@@ -996,7 +999,6 @@ function NoteFolderOverviewPanel({
   onSetSectionColor?: (sectionId: string, accentColor: string) => void;
   onSelectFolder: (nodeId: string | null) => void;
   onSelectNote: (nodeId: string | null) => void;
-  onStartEditingNote?: (note: Note, nodeId: string) => void;
   onRenameNote?: (note: Note, nextFileName: string) => Promise<void> | void;
   onOpenNoteHistory?: (note: Note) => void;
   onTogglePinnedNote?: (noteId: string, nextPinned: boolean) => void;
@@ -1665,15 +1667,17 @@ function NoteFolderOverviewPanel({
             </div>
           ) : null}
           <div className="note-folder-overview__preview markdown-body">
-            <MarkdownContent
-              allowIframeScripts={allowIframeScripts}
-              contentScale={previewContentScale}
-              isImmersive={false}
-              markdown={selectedNote.content}
-              noteSourcePath={selectedNote.sourcePath}
-              omitRootWrapper
-              useSandboxFrame
-            />
+            <Suspense fallback={<div className="muted">Loading preview...</div>}>
+              <MarkdownContent
+                allowIframeScripts={allowIframeScripts}
+                contentScale={previewContentScale}
+                isImmersive={false}
+                markdown={selectedNote.content}
+                noteSourcePath={selectedNote.sourcePath}
+                omitRootWrapper
+                useSandboxFrame
+              />
+            </Suspense>
           </div>
           {previewSupplementary ? <div className="note-folder-overview__preview-supplementary">{previewSupplementary}</div> : null}
         </>
@@ -2064,7 +2068,7 @@ function NoteFolderOverviewPanel({
               </div>
               {!isTreeCollapsed ? (
                 <div className="note-folder-overview__tree">
-                  {notesNavigationMode !== "section" ? (
+                  {!isSectionView ? (
                     <div className={`tree-folder note-tree-folder ${effectiveActiveSection ? (isNoteDragActive || selectedNodeId === effectiveActiveSection.id) ? "is-selected" : "" : isRoot ? "is-selected" : ""}`}>
                       <div className="tree-folder__title">
                         <span
@@ -2137,7 +2141,7 @@ function NoteFolderOverviewPanel({
                       ) : null}
                     </div>
                   ) : (
-                    <p className="muted">{notesNavigationMode === "section" ? "No folders in this section yet." : activeSection ? "No notes or subfolders in this section yet." : "No child folders yet."}</p>
+                    <p className="muted">{isSectionView ? "No folders in this section yet." : activeSection ? "No notes or subfolders in this section yet." : "No child folders yet."}</p>
                   )}
                 </div>
               ) : null}
@@ -3014,536 +3018,4 @@ function RecentDocumentCard({
 
 
 export { NoteTreeItem, NoteFolderOverviewPanel, NoteSummaryCard, NoteListCard, RecentDocumentCard };
-
-// --- Trash Panel ---
-
-export function TrashPanel({
-  entries,
-  onClose,
-  onRestore,
-  onPurge,
-  onPurgeAll,
-}: {
-  entries: Array<{ id: string; sourcePath: string; title: string; deletedAt: string }>;
-  onClose: () => void;
-  onRestore: (id: string) => void;
-  onPurge: (id: string) => void;
-  onPurgeAll: () => void;
-}) {
-  return (
-    <div className="dialog-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div aria-labelledby="trash-panel-title" className="dialog-card trash-panel" role="dialog">
-        <div className="dialog-card__header">
-          <div>
-            <p className="eyebrow">Deleted notes</p>
-            <h3 id="trash-panel-title">Trash {entries.length > 0 ? `(${entries.length})` : ""}</h3>
-          </div>
-          <div className="trash-panel__header-actions">
-            {entries.length > 0 ? (
-              <button className="mini-action" onClick={onPurgeAll} type="button">
-                <Trash2 size={13} />
-                Empty trash
-              </button>
-            ) : null}
-            <button aria-label="Close trash" className="icon-action" onClick={onClose} title="Close" type="button"><X size={14} /></button>
-          </div>
-        </div>
-        {entries.length === 0 ? (
-          <p className="dialog-card__body trash-panel__empty">Trash is empty — deleted notes will appear here for recovery.</p>
-        ) : (
-          <div className="trash-panel__list">
-            {entries.map((entry) => {
-              const deletedLabel = `Deleted ${new Date(entry.deletedAt).toLocaleString()}`;
-              const descriptionLabel = `${entry.sourcePath} · ${deletedLabel}`;
-
-              return (
-                <div className="trash-panel__entry" key={entry.id}>
-                  <div className="trash-panel__entry-info">
-                    <strong className="trash-panel__entry-title" title={entry.title}>{entry.title}</strong>
-                    <span className="muted trash-panel__entry-description" title={descriptionLabel}>{descriptionLabel}</span>
-                  </div>
-                  <div className="trash-panel__entry-actions">
-                    <button className="mini-action" onClick={() => onRestore(entry.id)} type="button">Restore</button>
-                    <button className="mini-action" onClick={() => onPurge(entry.id)} type="button">Delete forever</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// --- Daily Note Navigator ---
-
-export function DailyNoteNavigator({
-  currentDate,
-  onSelectDate,
-}: {
-  currentDate: string;
-  onSelectDate: (date: string) => void;
-}) {
-  const [selectedDate, setSelectedDate] = useState(currentDate || new Date().toISOString().slice(0, 10));
-
-  function navigateDay(offset: number) {
-    const d = new Date(selectedDate + "T00:00:00");
-    d.setDate(d.getDate() + offset);
-    const newDate = d.toISOString().slice(0, 10);
-    setSelectedDate(newDate);
-    onSelectDate(newDate);
-  }
-
-  return (
-    <div className="daily-note-nav">
-      <button className="mini-action" onClick={() => navigateDay(-1)} type="button">←</button>
-      <input
-        className="daily-note-nav__date"
-        onChange={(e) => {
-          setSelectedDate(e.target.value);
-          onSelectDate(e.target.value);
-        }}
-        type="date"
-        value={selectedDate}
-      />
-      <button className="mini-action" onClick={() => navigateDay(1)} type="button">→</button>
-      <button
-        className="mini-action"
-        onClick={() => {
-          const today = new Date().toISOString().slice(0, 10);
-          setSelectedDate(today);
-          onSelectDate(today);
-        }}
-        type="button"
-      >
-        Today
-      </button>
-    </div>
-  );
-}
-
-// --- Graph View ---
-
-export function GraphView({
-  nodes,
-  links,
-  onSelectNode,
-}: {
-  nodes: Array<{ id: string; title: string; sourcePath: string; linkCount: number }>;
-  links: Array<{ source: string; target: string }>;
-  onSelectNode: (sourcePath: string) => void;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const positionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || nodes.length === 0) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const width = canvas.parentElement?.clientWidth ?? 600;
-    const height = canvas.parentElement?.clientHeight ?? 400;
-    canvas.width = width;
-    canvas.height = height;
-
-    // Initialize positions in a circle layout
-    const positions = new Map<string, { x: number; y: number; vx: number; vy: number }>();
-    const cx = width / 2;
-    const cy = height / 2;
-    const radius = Math.min(width, height) * 0.35;
-
-    nodes.forEach((node, i) => {
-      const angle = (2 * Math.PI * i) / nodes.length;
-      positions.set(node.id, {
-        x: cx + radius * Math.cos(angle),
-        y: cy + radius * Math.sin(angle),
-        vx: 0,
-        vy: 0,
-      });
-    });
-
-    const nodeIdSet = new Set(nodes.map((n) => n.id));
-    const validLinks = links.filter((l) => nodeIdSet.has(l.source) && nodeIdSet.has(l.target));
-
-    // Simple force-directed simulation
-    let animationFrame: number;
-    let iterations = 0;
-    const maxIterations = 120;
-
-    function simulate() {
-      if (iterations >= maxIterations) {
-        // Store final positions
-        for (const [id, pos] of positions) {
-          positionsRef.current.set(id, { x: pos.x, y: pos.y });
-        }
-        draw();
-        return;
-      }
-      iterations++;
-
-      // Repulsion
-      for (const a of positions.values()) {
-        for (const b of positions.values()) {
-          if (a === b) continue;
-          const dx = a.x - b.x;
-          const dy = a.y - b.y;
-          const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-          const force = 800 / (dist * dist);
-          a.vx += (dx / dist) * force;
-          a.vy += (dy / dist) * force;
-        }
-      }
-
-      // Attraction along links
-      for (const link of validLinks) {
-        const a = positions.get(link.source);
-        const b = positions.get(link.target);
-        if (!a || !b) continue;
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const force = dist * 0.01;
-        a.vx += (dx / dist) * force;
-        a.vy += (dy / dist) * force;
-        b.vx -= (dx / dist) * force;
-        b.vy -= (dy / dist) * force;
-      }
-
-      // Center gravity
-      for (const pos of positions.values()) {
-        pos.vx += (cx - pos.x) * 0.002;
-        pos.vy += (cy - pos.y) * 0.002;
-        pos.x += pos.vx * 0.3;
-        pos.y += pos.vy * 0.3;
-        pos.vx *= 0.85;
-        pos.vy *= 0.85;
-      }
-
-      for (const [id, pos] of positions) {
-        positionsRef.current.set(id, { x: pos.x, y: pos.y });
-      }
-
-      draw();
-      animationFrame = requestAnimationFrame(simulate);
-    }
-
-    function draw() {
-      if (!ctx) return;
-      ctx.clearRect(0, 0, width, height);
-
-      // Draw links
-      ctx.strokeStyle = "rgba(255,255,255,0.15)";
-      ctx.lineWidth = 1;
-      for (const link of validLinks) {
-        const a = positions.get(link.source);
-        const b = positions.get(link.target);
-        if (!a || !b) continue;
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-      }
-
-      // Draw nodes
-      for (const node of nodes) {
-        const pos = positions.get(node.id);
-        if (!pos) continue;
-        const r = 4 + Math.min(node.linkCount * 2, 12);
-        const isHovered = hoveredNode === node.id;
-
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, r, 0, 2 * Math.PI);
-        ctx.fillStyle = isHovered ? "#58a6ff" : "#78e6c6";
-        ctx.fill();
-
-        if (isHovered) {
-          ctx.font = "12px system-ui";
-          ctx.fillStyle = "#e6edf3";
-          ctx.textAlign = "center";
-          ctx.fillText(node.title, pos.x, pos.y - r - 6);
-        }
-      }
-    }
-
-    simulate();
-
-    return () => cancelAnimationFrame(animationFrame);
-  }, [nodes, links, hoveredNode]);
-
-  function handleCanvasClick(event: React.MouseEvent<HTMLCanvasElement>) {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const mx = event.clientX - rect.left;
-    const my = event.clientY - rect.top;
-
-    for (const node of nodes) {
-      const pos = positionsRef.current.get(node.id);
-      if (!pos) continue;
-      const r = 4 + Math.min(node.linkCount * 2, 12);
-      const dx = mx - pos.x;
-      const dy = my - pos.y;
-      if (dx * dx + dy * dy < (r + 4) * (r + 4)) {
-        onSelectNode(node.sourcePath);
-        return;
-      }
-    }
-  }
-
-  function handleCanvasMove(event: React.MouseEvent<HTMLCanvasElement>) {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const mx = event.clientX - rect.left;
-    const my = event.clientY - rect.top;
-
-    for (const node of nodes) {
-      const pos = positionsRef.current.get(node.id);
-      if (!pos) continue;
-      const r = 4 + Math.min(node.linkCount * 2, 12);
-      const dx = mx - pos.x;
-      const dy = my - pos.y;
-      if (dx * dx + dy * dy < (r + 4) * (r + 4)) {
-        setHoveredNode(node.id);
-        return;
-      }
-    }
-    setHoveredNode(null);
-  }
-
-  return (
-    <div className="graph-view">
-      <div className="graph-view__header">
-        <p className="eyebrow">Knowledge graph</p>
-        <h4>Note connections</h4>
-        <span className="muted">{nodes.length} notes · {links.length} links</span>
-      </div>
-      <div className="graph-view__canvas-wrapper">
-        <canvas
-          className="graph-view__canvas"
-          onClick={handleCanvasClick}
-          onMouseMove={handleCanvasMove}
-          ref={canvasRef}
-        />
-      </div>
-    </div>
-  );
-}
-
-// --- Note Link Autocomplete ---
-
-export function NoteLinkAutocomplete({
-  notes,
-  textareaRef,
-  onInsertLink,
-}: {
-  notes: Note[];
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-  onInsertLink: (linkText: string) => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [filter, setFilter] = useState("");
-  const [position, setPosition] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    function handleInput(e: Event) {
-      const target = e.target as HTMLTextAreaElement;
-      const pos = target.selectionStart;
-      const text = target.value.slice(0, pos);
-      const lastBrackets = text.lastIndexOf("[[");
-
-      if (lastBrackets !== -1 && !text.slice(lastBrackets).includes("]]")) {
-        const partial = text.slice(lastBrackets + 2);
-        setFilter(partial);
-        setIsOpen(true);
-
-        // Approximate caret position
-        const lines = text.split("\n");
-        const lineNum = lines.length - 1;
-        const charPos = lines[lineNum].length;
-        setPosition({ top: lineNum * 20 + 24, left: Math.min(charPos * 8, 300) });
-      } else {
-        setIsOpen(false);
-      }
-    }
-
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setIsOpen(false);
-    }
-
-    textarea.addEventListener("input", handleInput);
-    textarea.addEventListener("keydown", handleKeyDown);
-    return () => {
-      textarea.removeEventListener("input", handleInput);
-      textarea.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [textareaRef]);
-
-  const filtered = useMemo(() => {
-    if (!isOpen || !filter) return notes.slice(0, 15);
-    const lowerFilter = filter.toLowerCase();
-    return notes
-      .filter((n) => n.title.toLowerCase().includes(lowerFilter))
-      .slice(0, 15);
-  }, [notes, filter, isOpen]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="note-link-autocomplete" style={{ top: position.top, left: position.left }}>
-      {filtered.length === 0 ? (
-        <div className="note-link-autocomplete__empty">No matching notes</div>
-      ) : (
-        filtered.map((note) => (
-          <button
-            className="note-link-autocomplete__item"
-            key={note.id}
-            onClick={() => {
-              onInsertLink(`[[${note.title}]]`);
-              setIsOpen(false);
-            }}
-            type="button"
-          >
-            {note.title}
-          </button>
-        ))
-      )}
-    </div>
-  );
-}
-
-// --- Full-text Search Results ---
-
-export function FullTextSearchResults({
-  results,
-  query,
-  onSelectNote,
-}: {
-  results: Array<{ noteId: string; sourcePath: string; title: string; snippet: string; matchStart: number; matchEnd: number }>;
-  query: string;
-  onSelectNote: (sourcePath: string) => void;
-}) {
-  if (results.length === 0 && query) {
-    return (
-      <article className="bookmark-empty">
-        <h4>No results</h4>
-        <p>No notes matched "{query}".</p>
-      </article>
-    );
-  }
-
-  return (
-    <div className="fulltext-results">
-      {results.map((result, index) => (
-        <button
-          className="fulltext-results__item"
-          key={`${result.noteId}-${index}`}
-          onClick={() => onSelectNote(result.sourcePath)}
-          type="button"
-        >
-          <strong>{result.title}</strong>
-          <p className="fulltext-results__snippet">
-            {result.snippet.slice(0, result.matchStart)}
-            <mark>{result.snippet.slice(result.matchStart, result.matchEnd)}</mark>
-            {result.snippet.slice(result.matchEnd)}
-          </p>
-          <span className="muted">{result.sourcePath}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// --- Smart Folders ---
-
-export function SmartFoldersList({
-  folders,
-  onSelect,
-  onDelete,
-  onAdd,
-}: {
-  folders: Array<{ id: string; label: string; query: string }>;
-  onSelect: (query: string) => void;
-  onDelete: (id: string) => void;
-  onAdd: () => void;
-}) {
-  return (
-    <div className="smart-folders">
-      <div className="smart-folders__header">
-        <h5>Smart Folders</h5>
-        <button className="mini-action" onClick={onAdd} type="button">
-          <Plus size={14} /> New
-        </button>
-      </div>
-      {folders.length === 0 ? (
-        <p className="muted">No smart folders yet. Create one from a search query.</p>
-      ) : (
-        <div className="smart-folders__list">
-          {folders.map((folder) => (
-            <div className="smart-folders__item" key={folder.id}>
-              <button className="smart-folders__item-main" onClick={() => onSelect(folder.query)} type="button">
-                <Folder size={14} />
-                <span>{folder.label}</span>
-                <span className="muted">{folder.query}</span>
-              </button>
-              <button className="icon-action" onClick={() => onDelete(folder.id)} title="Remove" type="button">
-                <X size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// --- Workspace Switcher ---
-
-export function WorkspaceSwitcher({
-  workspaces,
-  onSwitch,
-  onAdd,
-  onRemove,
-}: {
-  workspaces: Array<{ id: string; label: string; path: string; isActive: boolean }>;
-  onSwitch: (id: string) => void;
-  onAdd: () => void;
-  onRemove: (id: string) => void;
-}) {
-  return (
-    <div className="workspace-switcher">
-      <div className="workspace-switcher__header">
-        <h5>Workspaces</h5>
-        <button className="mini-action" onClick={onAdd} type="button">
-          <Plus size={14} /> Add
-        </button>
-      </div>
-      <div className="workspace-switcher__list">
-        {workspaces.map((ws) => (
-          <div className={`workspace-switcher__item ${ws.isActive ? "is-active" : ""}`} key={ws.id}>
-            <button className="workspace-switcher__item-main" onClick={() => onSwitch(ws.id)} type="button">
-              <Folder size={14} />
-              <div>
-                <strong>{ws.label}</strong>
-                <span className="muted">{ws.path}</span>
-              </div>
-              {ws.isActive ? <Check size={14} /> : null}
-            </button>
-            {!ws.isActive ? (
-              <button className="icon-action" onClick={() => onRemove(ws.id)} title="Remove workspace" type="button">
-                <X size={14} />
-              </button>
-            ) : null}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+export { TrashPanel, DailyNoteNavigator, GraphView, NoteLinkAutocomplete, FullTextSearchResults, SmartFoldersList, WorkspaceSwitcher };

@@ -26,8 +26,8 @@ export function getClientPlatform(userAgent = getClientUserAgent()) {
   return "other" as const;
 }
 
-export function shouldUseManualFolderPaths(userAgent = getClientUserAgent()) {
-  return isWindowsUserAgent(userAgent);
+export function shouldUseManualFolderPaths(_userAgent = getClientUserAgent()) {
+  return isWindowsUserAgent(_userAgent);
 }
 
 export function getFolderPathPlaceholder(userAgent = getClientUserAgent()) {
