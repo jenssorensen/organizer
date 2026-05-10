@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useRef, useState, useEffect, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   AlertTriangle,
   AppWindow,
@@ -33,13 +33,14 @@ import {
   X,
 } from "lucide-react";
 import { apiFetch as fetch } from "../apiFetch";
-import type { BookmarkDialogState, Note, NavItem, NoteCreationDialogState, QuickCaptureState, RestorePointSummary, SectionId, TodoItem } from "../types";
+import type { BookmarkDialogState, Note, NoteCreationDialogState, QuickCaptureState, RestorePointSummary, TodoItem } from "../types";
 import {
   SUPPORTED_NOTE_FILE_TYPES,
   type NoteVersion,
   type AppPrefs,
   type SupportedNoteFileType,
 } from "../appTypes";
+import { CommandPalette } from "./dialogs/CommandPalette";
 
 const NOTE_TEMPLATES = [
   { id: "blank", label: "Blank", icon: FileText, preview: "Start with an empty document" },
@@ -331,214 +332,6 @@ function NoteCreationDialog({
   );
 }
 
-function CommandPalette({
-  allNotes,
-  canEditSelectedNote,
-  isNoteEditing,
-  navItems,
-  onClose,
-  onNavigateSection,
-  onOpenNote,
-  onStartEditing,
-  onCancelEditing,
-  onSaveEditing,
-  onToggleSidebar,
-  onOpenSearch,
-  onOpenTags,
-  onOpenBrokenLinks,
-  onOpenDailyNote,
-  onShowTriage,
-  onShowTaskTemplates,
-  onShowKeyboardHelp,
-  onOpenGraphView,
-  onCreateDocument,
-  onAddTodo,
-  onQuickCapture,
-  query,
-  onQueryChange,
-  selectedNote,
-  todoItems,
-}: {
-  allNotes: Note[];
-  canEditSelectedNote: boolean;
-  isNoteEditing: boolean;
-  navItems: NavItem[];
-  onClose: () => void;
-  onNavigateSection: (section: SectionId) => void;
-  onOpenNote: (note: Note) => void;
-  onStartEditing: () => void;
-  onCancelEditing: () => void;
-  onSaveEditing: () => void;
-  onToggleSidebar: () => void;
-  onOpenSearch: () => void;
-  onOpenTags: () => void;
-  onOpenBrokenLinks: () => void;
-  onOpenDailyNote: () => void;
-  onShowTriage: () => void;
-  onShowTaskTemplates: () => void;
-  onShowKeyboardHelp: () => void;
-  onOpenGraphView: () => void;
-  onCreateDocument: () => void;
-  onAddTodo: () => void;
-  onQuickCapture: () => void;
-  query: string;
-  onQueryChange: (q: string) => void;
-  selectedNote: Note | null;
-  todoItems: TodoItem[];
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  interface PaletteCommand {
-    id: string;
-    label: string;
-    subtitle?: string;
-    category: string;
-    action: () => void;
-  }
-
-  const allCommands = useMemo<PaletteCommand[]>(() => {
-    const cmds: PaletteCommand[] = [];
-
-    // Section navigation
-    for (const item of navItems) {
-      cmds.push({
-        id: `nav-${item.id}`,
-        label: `Go to ${item.label}`,
-        subtitle: `Section · ${item.count} items`,
-        category: "Navigate",
-        action: () => { onNavigateSection(item.id); onClose(); },
-      });
-    }
-
-    // Note commands
-    if (selectedNote && canEditSelectedNote) {
-      if (isNoteEditing) {
-        cmds.push({ id: "cmd-save", label: "Save note", subtitle: selectedNote.title, category: "Note", action: () => { onSaveEditing(); onClose(); } });
-        cmds.push({ id: "cmd-cancel-edit", label: "Cancel editing", subtitle: selectedNote.title, category: "Note", action: () => { onCancelEditing(); onClose(); } });
-      } else {
-        cmds.push({ id: "cmd-edit", label: "Edit note", subtitle: selectedNote.title, category: "Note", action: () => { onStartEditing(); onClose(); } });
-      }
-    }
-
-    // Create commands
-    cmds.push({ id: "cmd-new-note", label: "New document", subtitle: "Create a new markdown note", category: "Create", action: () => { onCreateDocument(); onClose(); } });
-    cmds.push({ id: "cmd-new-todo", label: "New task", subtitle: "Add a todo item", category: "Create", action: () => { onAddTodo(); onClose(); } });
-    cmds.push({ id: "cmd-quick-capture", label: "Quick capture", subtitle: "Capture a task, note, or bookmark (Ctrl+Alt+N)", category: "Create", action: () => { onQuickCapture(); onClose(); } });
-    cmds.push({ id: "cmd-task-templates", label: "Create tasks from template", subtitle: "Sprint, Weekly Review, Project Launch…", category: "Create", action: () => { onShowTaskTemplates(); onClose(); } });
-    cmds.push({ id: "cmd-daily-note", label: "Open today's daily note", subtitle: "Navigate to today's journal entry", category: "Create", action: () => { onOpenDailyNote(); onClose(); } });
-
-    // View commands
-    cmds.push({ id: "cmd-triage", label: "Open triage view", subtitle: "Due today, stale notes, unsorted bookmarks…", category: "View", action: () => { onShowTriage(); onClose(); } });
-    cmds.push({ id: "cmd-sidebar", label: "Toggle sidebar", category: "View", action: () => { onToggleSidebar(); onClose(); } });
-    cmds.push({ id: "cmd-search", label: "Open search panel", category: "View", action: onOpenSearch });
-    cmds.push({ id: "cmd-graph", label: "Open graph view", subtitle: "Visualise note connections", category: "View", action: () => { onOpenGraphView(); onClose(); } });
-    cmds.push({ id: "cmd-tags", label: "Browse tags", category: "View", action: () => { onOpenTags(); } });
-    cmds.push({ id: "cmd-broken-links", label: "Check broken links", category: "View", action: () => { onOpenBrokenLinks(); } });
-    cmds.push({ id: "cmd-keyboard", label: "Keyboard shortcuts", subtitle: "View all keyboard shortcuts", category: "Help", action: () => { onShowKeyboardHelp(); onClose(); } });
-
-    // Open notes
-    const noteList = allNotes.filter((n) => n.kind !== "wiki").slice(0, 30);
-    for (const note of noteList) {
-      cmds.push({
-        id: `note-${note.id}`,
-        label: note.title,
-        subtitle: note.sourcePath ?? undefined,
-        category: "Notes",
-        action: () => { onOpenNote(note); onClose(); },
-      });
-    }
-
-    // Open todos (top 20 open tasks)
-    const openTodos = todoItems.filter((t) => t.status !== "completed").slice(0, 20);
-    for (const todo of openTodos) {
-      cmds.push({
-        id: `todo-${todo.id}`,
-        label: todo.title,
-        subtitle: `Task · ${todo.status}`,
-        category: "Tasks",
-        action: () => { onNavigateSection("todo"); onClose(); },
-      });
-    }
-
-    return cmds;
-  }, [allNotes, canEditSelectedNote, isNoteEditing, navItems, onAddTodo, onCancelEditing, onClose, onCreateDocument, onNavigateSection, onOpenBrokenLinks, onOpenDailyNote, onOpenGraphView, onOpenNote, onOpenSearch, onOpenTags, onQuickCapture, onSaveEditing, onShowKeyboardHelp, onShowTaskTemplates, onShowTriage, onStartEditing, onToggleSidebar, selectedNote, todoItems]);
-
-  const filteredCommands = useMemo(() => {
-    if (!query.trim()) return allCommands;
-    const q = query.toLowerCase();
-    return allCommands.filter(
-      (cmd) => cmd.label.toLowerCase().includes(q) || cmd.category.toLowerCase().includes(q) || (cmd.subtitle?.toLowerCase().includes(q) ?? false),
-    );
-  }, [allCommands, query]);
-
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [query]);
-
-  function handleKeyDown(event: ReactKeyboardEvent) {
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, filteredCommands.length - 1));
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setActiveIndex((i) => Math.max(i - 1, 0));
-    } else if (event.key === "Enter") {
-      event.preventDefault();
-      filteredCommands[activeIndex]?.action();
-    } else if (event.key === "Escape") {
-      onClose();
-    }
-  }
-
-  return (
-    <div className="dialog-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div aria-label="Command palette" className="dialog-card command-palette" role="dialog" aria-modal="true">
-        <div className="command-palette__search">
-          <Command size={16} />
-          <input
-            ref={inputRef}
-            className="command-palette__input"
-            onChange={(e) => onQueryChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Search commands or notes..."
-            type="text"
-            value={query}
-          />
-          <button aria-label="Close" className="icon-action" onClick={onClose} type="button">
-            <X size={14} />
-          </button>
-        </div>
-        <div className="command-palette__list">
-          {filteredCommands.length === 0 ? (
-            <div className="command-palette__empty">No commands found</div>
-          ) : (
-            filteredCommands.map((cmd, index) => (
-              <button
-                key={cmd.id}
-                className={`command-palette__item ${index === activeIndex ? "is-active" : ""}`}
-                onClick={cmd.action}
-                onMouseEnter={() => setActiveIndex(index)}
-                type="button"
-              >
-                <span className="command-palette__item-body">
-                  <span className="command-palette__item-label">{cmd.label}</span>
-                  {cmd.subtitle ? <span className="command-palette__item-subtitle">{cmd.subtitle}</span> : null}
-                </span>
-                <span className="category-badge">{cmd.category}</span>
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function TagBrowserDialog({
   allTags,
   onClose,
@@ -749,7 +542,7 @@ function ExportImportDialog({
     <div className="dialog-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div aria-labelledby="export-import-title" className="dialog-card export-import" role="dialog" aria-modal="true">
         <div className="export-import__layout">
-          <nav className="export-import__nav" aria-label="Backup and restore actions">
+          <nav aria-label="Backup and restore actions" className="export-import__nav" role="tablist">
             <div className="export-import__nav-header">
               <History size={18} />
               <span>Backup &amp; Restore</span>
@@ -801,6 +594,7 @@ function ExportImportDialog({
               </p>
               <input
                 ref={fileInputRef}
+                aria-label="Choose a backup pack file"
                 className="hidden-input"
                 type="file"
                 accept=".json,application/json"
@@ -1437,7 +1231,7 @@ function MetaDataSetupDialog({
 
   return (
     <div className="dialog-backdrop dialog-backdrop--setup" role="presentation">
-      <div className="dialog-card meta-data-setup" aria-modal="true">
+      <div aria-modal="true" className="dialog-card meta-data-setup" role="dialog">
         <h2>Welcome to Organizer</h2>
         <p className="meta-data-setup__description">
           Choose a folder where Organizer will store your metadata (bookmarks, todos, starred notes, etc.).
@@ -1689,7 +1483,7 @@ function TriagePanel({
 
   return (
     <div className="dialog-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div aria-labelledby="triage-dialog-title" className="dialog-card triage-dialog" role="dialog">
+      <div aria-labelledby="triage-dialog-title" aria-modal="true" className="dialog-card triage-dialog" role="dialog">
         <div className="dialog-card__header">
           <div>
             <p className="eyebrow">Smart triage</p>
@@ -1804,7 +1598,7 @@ function PinnedNotesDialog({
 }) {
   return (
     <div className="dialog-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div aria-labelledby="pinned-dialog-title" className="dialog-card pinned-dialog" role="dialog">
+      <div aria-labelledby="pinned-dialog-title" aria-modal="true" className="dialog-card pinned-dialog" role="dialog">
         <div className="dialog-card__header">
           <div>
             <p className="eyebrow">Dashboard</p>

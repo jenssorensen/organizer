@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   DEFAULT_SUPPORTED_NOTE_FILE_TYPES,
   SUPPORTED_NOTE_FILE_TYPES,
@@ -26,9 +26,9 @@ import {
   QuickCaptureDialog,
   NOTE_TEMPLATES,
 } from "./components/Dialogs";
-import { NoteFolderOverviewPanel, NoteListCard, RecentDocumentCard, TrashPanel, DailyNoteNavigator, GraphView, WorkspaceSwitcher } from "./components/NoteComponents";
+import { NoteFolderOverviewPanel, NoteListCard, RecentDocumentCard } from "./components/NoteComponents";
+import { DailyNoteNavigator, TrashPanel, WorkspaceSwitcher } from "./components/notes/NotePanels";
 import { TodoWorkspace } from "./components/TodoComponents";
-import { MarkdownContent, MarkdownEditor, WikiUnfurlCard } from "./components/MarkdownComponents";
 import { BookmarkMenuBar, BookmarkDomainTree, BookmarkOverviewPanel, normalizeBookmarkMenuRoots } from "./components/BookmarkComponents";
 import { getClientPlatform, getFolderPathPlaceholder, shouldUseManualFolderPaths } from "./clientPlatform";
 import { getImmersiveChromeState } from "./immersiveLayout";
@@ -95,11 +95,11 @@ import type {
   WorkspaceInfo,
   WorkspaceBackupSnapshot,
 } from "./types";
-import { useBookmarksData } from "./useBookmarksData";
-import { useExpandedNoteFolders } from "./useExpandedNoteFolders";
-import { useNavigationHistoryState } from "./useNavigationHistoryState";
-import { useNotesData } from "./useNotesData";
-import { useRecentDocumentsState } from "./useRecentDocumentsState";
+import { useBookmarksData } from "./hooks/useBookmarksData";
+import { useExpandedNoteFolders } from "./hooks/useExpandedNoteFolders";
+import { useNavigationHistoryState } from "./hooks/useNavigationHistoryState";
+import { useNotesData } from "./hooks/useNotesData";
+import { useRecentDocumentsState } from "./hooks/useRecentDocumentsState";
 import {
   buildTodoPayload,
   createDefaultTodoItem,
@@ -111,7 +111,7 @@ import {
   spawnNextRecurrence,
   updateTodoItems,
 } from "./todoState";
-import { useTodoData } from "./useTodoData";
+import { useTodoData } from "./hooks/useTodoData";
 import {
   Bell,
   Bookmark,
@@ -132,9 +132,7 @@ import {
   Keyboard,
   LayoutList,
   Link2,
-  ListTree,
   Maximize2,
-  ExternalLink,
   PanelLeftClose,
   PanelLeftOpen,
   Pin,
@@ -151,6 +149,11 @@ import {
   Settings,
 } from "lucide-react";
 import { apiFetch as fetch } from "./apiFetch";
+
+const MarkdownContent = lazy(() => import("./components/markdown/MarkdownContent").then((module) => ({ default: module.MarkdownContent })));
+const MarkdownEditor = lazy(() => import("./components/markdown/MarkdownEditor").then((module) => ({ default: module.MarkdownEditor })));
+const WikiUnfurlCard = lazy(() => import("./components/markdown/WikiUnfurlCard").then((module) => ({ default: module.WikiUnfurlCard })));
+const GraphView = lazy(() => import("./components/notes/NoteGraphView").then((module) => ({ default: module.GraphView })));
 
 const defaultNavOrder: SectionId[] = ["notes", "bookmarks", "todo", "starred", "recent"];
 const sidebarApiBase = "";
@@ -2477,7 +2480,6 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       onSelectSection={(nodeId) => navigateNoteSelection(nodeId === "__general__" ? ROOT_NOTE_NODE_ID : nodeId, "notes")}
       onSetSectionColor={section === "notes" ? handleSetNoteSectionColor : undefined}
       onSelectFolder={navigateNoteSelection}
-      onStartEditingNote={section === "notes" ? handleStartEditingNote : undefined}
       onRenameNote={section === "notes" ? handleRenameNoteFile : undefined}
       onOpenNoteHistory={(note) => {
         setVersionHistoryNote(note);
@@ -2498,7 +2500,11 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       previewContentScale={immersiveZoomPercent}
       previewSupplementary={
         (section === "wiki" || section === "bookmarks") && wikiUnfurl && !isNoteEditing
-          ? <WikiUnfurlCard unfurl={wikiUnfurl} />
+          ? (
+            <Suspense fallback={<div className="muted">Loading preview...</div>}>
+              <WikiUnfurlCard unfurl={wikiUnfurl} />
+            </Suspense>
+          )
           : null
       }
       previewToolbarActions={notePreviewToolbarActions}
@@ -4176,6 +4182,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
         </button>
         <input
           ref={bookmarkImportInputRef}
+          aria-label="Choose a bookmarks HTML export file"
           className="hidden-input"
           type="file"
           accept=".html,text/html"
@@ -4982,28 +4989,30 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                         } ${isMarkdownImmersive ? "is-immersive" : ""} ${isNoteEditing ? "is-editing" : ""}`}
                       >
                         {isNoteEditing ? (
-                          <MarkdownEditor
-                            allowIframeScripts={prefs.allowIframeScripts}
-                            canSave={isNoteDraftDirty}
-                            documentPath={selectedNote.sourcePath || selectedNote.title}
-                            noteSourcePath={selectedNote.sourcePath}
-                            initialScrollRatio={pendingEditorScrollRatio}
-                            markdown={noteDraft}
-                            onClose={() => void handleCloseNoteEditor()}
-                            onChange={setNoteDraft}
-                            onZoomIn={handleViewerZoomIn}
-                            onZoomOut={handleViewerZoomOut}
-                            onSave={handleSaveNoteEdits}
-                            previewContentScale={immersiveZoomPercent}
-                            previewLayout={markdownEditorPreviewLayout}
-                            resizePercent={editorSplitPercent}
-                            saveError={noteSaveError}
-                            saveState={noteSaveState}
-                            setPreviewLayout={setMarkdownEditorPreviewLayout}
-                            setShowPreview={setShowMarkdownEditorPreview}
-                            setResizePercent={setEditorSplitPercent}
-                            showPreview={showMarkdownEditorPreview}
-                          />
+                          <Suspense fallback={<div className="muted">Loading editor...</div>}>
+                            <MarkdownEditor
+                              allowIframeScripts={prefs.allowIframeScripts}
+                              canSave={isNoteDraftDirty}
+                              documentPath={selectedNote.sourcePath || selectedNote.title}
+                              noteSourcePath={selectedNote.sourcePath}
+                              initialScrollRatio={pendingEditorScrollRatio}
+                              markdown={noteDraft}
+                              onClose={() => void handleCloseNoteEditor()}
+                              onChange={setNoteDraft}
+                              onZoomIn={handleViewerZoomIn}
+                              onZoomOut={handleViewerZoomOut}
+                              onSave={handleSaveNoteEdits}
+                              previewContentScale={immersiveZoomPercent}
+                              previewLayout={markdownEditorPreviewLayout}
+                              resizePercent={editorSplitPercent}
+                              saveError={noteSaveError}
+                              saveState={noteSaveState}
+                              setPreviewLayout={setMarkdownEditorPreviewLayout}
+                              setShowPreview={setShowMarkdownEditorPreview}
+                              setResizePercent={setEditorSplitPercent}
+                              showPreview={showMarkdownEditorPreview}
+                            />
+                          </Suspense>
                         ) : (
                           <>
                             {showPersistentFolderOverview ? (
@@ -5017,17 +5026,19 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                                     {standaloneNoteViewerToolbarActions ? <div className="markdown-body__toolbar-side is-trailing">{standaloneNoteViewerToolbarActions}</div> : null}
                                   </div>
                                 ) : null}
-                                <MarkdownContent
-                                  contentRef={viewerContentRef}
-                                  contentScale={isMarkdownImmersive ? immersiveZoomPercent : 100}
-                                  isImmersive={isMarkdownImmersive}
-                                  markdown={selectedNote.content}
-                                  noteSourcePath={selectedNote.sourcePath}
-                                  allowIframeScripts={prefs.allowIframeScripts}
-                                  toolbarLeading={showDetachedStandaloneNoteToolbar ? undefined : notePreviewToolbarLeading}
-                                  toolbarActions={showDetachedStandaloneNoteToolbar ? undefined : standaloneNoteViewerToolbarActions}
-                                  useSandboxFrame
-                                />
+                                <Suspense fallback={<div className="muted">Loading note preview...</div>}>
+                                  <MarkdownContent
+                                    contentRef={viewerContentRef}
+                                    contentScale={isMarkdownImmersive ? immersiveZoomPercent : 100}
+                                    isImmersive={isMarkdownImmersive}
+                                    markdown={selectedNote.content}
+                                    noteSourcePath={selectedNote.sourcePath}
+                                    allowIframeScripts={prefs.allowIframeScripts}
+                                    toolbarLeading={showDetachedStandaloneNoteToolbar ? undefined : notePreviewToolbarLeading}
+                                    toolbarActions={showDetachedStandaloneNoteToolbar ? undefined : standaloneNoteViewerToolbarActions}
+                                    useSandboxFrame
+                                  />
+                                </Suspense>
                               </div>
                             ) : null}
                           </>
@@ -5210,12 +5221,14 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                 )}
               </div>
             ) : (
-              <MarkdownContent
-                allowIframeScripts={prefs.allowIframeScripts}
-                isImmersive={isMarkdownImmersive}
-                markdown={viewerContent.markdown}
-                useSandboxFrame
-              />
+              <Suspense fallback={<div className="muted">Loading markdown...</div>}>
+                <MarkdownContent
+                  allowIframeScripts={prefs.allowIframeScripts}
+                  isImmersive={isMarkdownImmersive}
+                  markdown={viewerContent.markdown}
+                  useSandboxFrame
+                />
+              </Suspense>
             )}
           </div>
 
@@ -5233,7 +5246,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                       + Save search
                     </button>
                   ) : null}
-                  <button className="icon-action" onClick={() => setIsSearchPanelOpen(false)} type="button">
+                  <button aria-label="Close search results" className="icon-action" onClick={() => setIsSearchPanelOpen(false)} title="Close search results" type="button">
                     <PanelRightClose size={14} />
                   </button>
                 </div>
@@ -5267,7 +5280,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                   <h3>Starred</h3>
                 </div>
                 <div className="inline-actions">
-                  <button className="icon-action" onClick={() => setIsStarredPanelOpen(false)} type="button">
+                  <button aria-label="Close starred panel" className="icon-action" onClick={() => setIsStarredPanelOpen(false)} title="Close starred panel" type="button">
                     <PanelRightClose size={14} />
                   </button>
                 </div>
@@ -5350,7 +5363,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                   >
                     Most viewed
                   </button>
-                  <button className="icon-action" onClick={() => setIsRecentPanelOpen(false)} type="button">
+                  <button aria-label="Close recent panel" className="icon-action" onClick={() => setIsRecentPanelOpen(false)} title="Close recent panel" type="button">
                     <PanelRightClose size={14} />
                   </button>
                 </div>
@@ -5453,7 +5466,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                   </button>
                 </div>
               ) : null}
-              <button className="icon-action" onClick={() => setOpenFeedPopup(null)} type="button">
+              <button aria-label="Close popup" className="icon-action" onClick={() => setOpenFeedPopup(null)} title="Close popup" type="button">
                 <X size={14} />
               </button>
             </div>
@@ -5698,7 +5711,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
         <div className="overlay-panel">
           <div className="overlay-panel__header">
             <h2>Daily Notes</h2>
-            <button className="icon-action" onClick={() => setShowDailyNotes(false)} type="button"><X size={14} /></button>
+            <button aria-label="Close daily notes" className="icon-action" onClick={() => setShowDailyNotes(false)} title="Close daily notes" type="button"><X size={14} /></button>
           </div>
           <DailyNoteNavigator
             currentDate={dailyNoteDate}
@@ -5711,17 +5724,19 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
         <div className="overlay-panel overlay-panel--large">
           <div className="overlay-panel__header">
             <h2>Graph View</h2>
-            <button className="icon-action" onClick={() => setShowGraphView(false)} type="button"><X size={14} /></button>
+            <button aria-label="Close graph view" className="icon-action" onClick={() => setShowGraphView(false)} title="Close graph view" type="button"><X size={14} /></button>
           </div>
-          <GraphView
-            nodes={graphData.nodes}
-            links={graphData.links}
-            onSelectNode={(sourcePath) => {
-              const note = notes.find((n) => n.sourcePath === sourcePath);
-              if (note) openNote(note);
-              setShowGraphView(false);
-            }}
-          />
+          <Suspense fallback={<div className="muted">Loading graph...</div>}>
+            <GraphView
+              nodes={graphData.nodes}
+              links={graphData.links}
+              onSelectNode={(sourcePath) => {
+                const note = notes.find((n) => n.sourcePath === sourcePath);
+                if (note) openNote(note);
+                setShowGraphView(false);
+              }}
+            />
+          </Suspense>
         </div>
       ) : null}
 
@@ -5729,7 +5744,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
         <div className="overlay-panel">
           <div className="overlay-panel__header">
             <h2>Workspaces</h2>
-            <button className="icon-action" onClick={() => setShowWorkspaceSwitcher(false)} type="button"><X size={14} /></button>
+            <button aria-label="Close workspaces" className="icon-action" onClick={() => setShowWorkspaceSwitcher(false)} title="Close workspaces" type="button"><X size={14} /></button>
           </div>
           <WorkspaceSwitcher
             workspaces={workspaces}
@@ -5777,7 +5792,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
               <p key={item.id} className="reminder-toast__item">{item.title}</p>
             ))}
           </div>
-          <button className="icon-action" onClick={() => setReminderNotifications([])} type="button"><X size={14} /></button>
+          <button aria-label="Dismiss reminders" className="icon-action" onClick={() => setReminderNotifications([])} title="Dismiss reminders" type="button"><X size={14} /></button>
         </div>
       ) : null}
     </div>

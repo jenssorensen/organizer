@@ -1,6 +1,5 @@
-import { useMemo, useState, useEffect, useRef, type CSSProperties, type DragEvent } from "react";
+import { Suspense, lazy, useMemo, useState, useEffect, useRef, type CSSProperties, type DragEvent } from "react";
 import { createPortal } from "react-dom";
-import { MarkdownContent } from "./MarkdownComponents";
 import {
   ChevronDown,
   ChevronUp,
@@ -22,6 +21,8 @@ import {
 } from "lucide-react";
 import { groupTodoItemsByCalendarDate, groupTodoItemsForListView, TODO_CALENDAR_NO_DUE_DATE_LABEL } from "../todoState";
 import type { PomodoroState, TodoItem, TodoPriority, TodoRecurrenceUnit, TodoStatus, TodoViewMode } from "../types";
+
+const MarkdownContent = lazy(() => import("./markdown/MarkdownContent").then((module) => ({ default: module.MarkdownContent })));
 
 const TODO_STATUS_OPTIONS: Array<{ label: string; value: TodoStatus }> = [
   { label: "Not started", value: "not-started" },
@@ -722,7 +723,9 @@ function TodoCard({
                       </div>
                       <div className="todo-card__subtask-child-markdown markdown-body">
                         {subtask.description.trim() ? (
-                          <MarkdownContent markdown={subtask.description} omitRootWrapper />
+                          <Suspense fallback={<p className="muted">Loading description...</p>}>
+                            <MarkdownContent markdown={subtask.description} omitRootWrapper />
+                          </Suspense>
                         ) : (
                           <p className="muted">No description yet.</p>
                         )}
@@ -740,7 +743,9 @@ function TodoCard({
           <span className="todo-card__description-label">Description</span>
           <div className="todo-card__description-markdown markdown-body">
             {item.description.trim() ? (
-              <MarkdownContent markdown={item.description} omitRootWrapper />
+              <Suspense fallback={<p className="muted">Loading description...</p>}>
+                <MarkdownContent markdown={item.description} omitRootWrapper />
+              </Suspense>
             ) : (
               <p className="muted">No description yet. Use Edit to add details, checkboxes, and links.</p>
             )}

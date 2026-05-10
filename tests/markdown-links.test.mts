@@ -21,7 +21,7 @@ test("keeps external markdown links opening in a new tab", () => {
 });
 
 test("app uses markdown link attributes helper", async () => {
-  const markdownComponentsSource = await readFile(new URL("../src/components/MarkdownComponents.tsx", import.meta.url), "utf8");
+  const renderedMarkdownSource = await readFile(new URL("../src/components/markdown/RenderedMarkdownDocument.tsx", import.meta.url), "utf8");
 
-  assert.match(markdownComponentsSource, /getMarkdownLinkAttributes/);
+  assert.match(renderedMarkdownSource, /getMarkdownLinkAttributes/);
 });

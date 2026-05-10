@@ -186,7 +186,10 @@ test("keeps the active editor selection visible in preview", () => {
 
 test("app wires the note editor controls and split layout", async () => {
   const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
-  const markdownComponentsSource = await readFile(new URL("../src/components/MarkdownComponents.tsx", import.meta.url), "utf8");
+  const markdownEditorSource = await readFile(new URL("../src/components/markdown/MarkdownEditor.tsx", import.meta.url), "utf8");
+  const markdownContentSource = await readFile(new URL("../src/components/markdown/MarkdownContent.tsx", import.meta.url), "utf8");
+  const markdownChromeSource = await readFile(new URL("../src/components/markdown/MarkdownEditorChrome.tsx", import.meta.url), "utf8");
+  const previewFrameSource = await readFile(new URL("../src/components/markdown/MarkdownPreviewFrame.tsx", import.meta.url), "utf8");
   const stylesheet = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
 
   assert.match(appSource, /const STORED_MARKDOWN_EDITOR_PREVIEW_VISIBILITY_KEY = "organizer:markdown-editor-preview-visible";/);
@@ -211,37 +214,37 @@ test("app wires the note editor controls and split layout", async () => {
   assert.match(appSource, /if \(!isEscapeKey\) \{\s*return;\s*\}/);
   assert.match(appSource, /if \(isNoteEditing\) \{\s*if \(!isNoteDraftDirty\) \{\s*handleCancelNoteEditing\(\);\s*handleCloseSelectedNote\(\);/);
   assert.match(appSource, /void handleCloseNoteEditor\(\);/);
-  assert.match(markdownComponentsSource, /markdown-editor/);
-  assert.match(markdownComponentsSource, /markdown-editor__resize-handle/);
-  assert.match(markdownComponentsSource, /markdown-editor__preview-body/);
-  assert.match(markdownComponentsSource, /spellCheck/);
-  assert.match(markdownComponentsSource, /canSave: boolean;/);
-  assert.match(markdownComponentsSource, /showPreview \? "Hide preview" : "Show preview"/);
-  assert.match(markdownComponentsSource, /showPreview \? <EyeOff size=\{16\} \/> : <Eye size=\{16\} \/>/);
+  assert.match(markdownEditorSource, /markdown-editor/);
+  assert.match(markdownEditorSource, /markdown-editor__resize-handle/);
+  assert.match(markdownEditorSource, /markdown-editor__preview-body/);
+  assert.match(markdownEditorSource, /spellCheck/);
+  assert.match(markdownEditorSource, /canSave: boolean;/);
+  assert.match(markdownChromeSource, /showPreview \? "Hide preview" : "Show preview"/);
+  assert.match(markdownChromeSource, /showPreview \? <EyeOff size=\{16\} \/> : <Eye size=\{16\} \/>/);
   assert.match(appSource, /showPreview=\{showMarkdownEditorPreview\}/);
   assert.match(appSource, /setShowPreview=\{setShowMarkdownEditorPreview\}/);
   assert.match(appSource, /previewLayout=\{markdownEditorPreviewLayout\}/);
   assert.match(appSource, /setPreviewLayout=\{setMarkdownEditorPreviewLayout\}/);
-  assert.match(markdownComponentsSource, /showPreview \? layoutStyle : undefined/);
-  assert.match(markdownComponentsSource, /showPreview && previewLayout === "side-by-side" \? "vertical" : "horizontal"/);
-  assert.match(markdownComponentsSource, /previewLayout === "side-by-side" \? "Below preview" : "Side by side"/);
-  assert.match(markdownComponentsSource, /previewLayout === "side-by-side" \? <SplitSquareVertical size=\{16\} \/> : <SplitSquareHorizontal size=\{16\} \/>/);
-  assert.doesNotMatch(markdownComponentsSource, /title="Bullet list"/);
-  assert.match(markdownComponentsSource, /className=\{`markdown-body__toolbar-side \$\{showPreview \? "" : "is-disabled"\}`\.trim\(\)\}/);
-  assert.match(markdownComponentsSource, /disabled=\{saveState === "saving" \|\| !showPreview\}/);
-  assert.match(markdownComponentsSource, /aria-label=\{previewLayout === "side-by-side" \? "Below preview" : "Side by side"\}[\s\S]*disabled=\{saveState === "saving" \|\| !showPreview\}/);
-  assert.match(markdownComponentsSource, /className="markdown-body__toolbar-side markdown-editor__toolbar-actions"/);
-  assert.match(markdownComponentsSource, /className="icon-action markdown-editor__save"/);
-  assert.match(markdownComponentsSource, /disabled=\{saveState === "saving" \|\| !canSave\}/);
-  assert.match(markdownComponentsSource, /aria-label="Close document"/);
-  assert.match(markdownComponentsSource, /function SandboxedPreviewFrame\(/);
-  assert.match(markdownComponentsSource, /allowScripts \? "allow-scripts" : ""/);
-  assert.match(markdownComponentsSource, /useSandboxFrame\?: boolean;/);
-  assert.match(markdownComponentsSource, /buildDocumentPreviewSrcDoc\(markdown, noteSourcePath\)/);
-  assert.doesNotMatch(markdownComponentsSource, /Cancel/);
-  assert.match(markdownComponentsSource, /markdown-editor__split--side-by-side/);
-  assert.match(markdownComponentsSource, /showPreview \? \(/);
-  assert.match(markdownComponentsSource, /onScroll=\{handleEditorScroll\}/);
+  assert.match(markdownEditorSource, /showPreview \? layoutStyle : undefined/);
+  assert.match(markdownChromeSource, /showPreview && previewLayout === "side-by-side" \? "vertical" : "horizontal"/);
+  assert.match(markdownChromeSource, /previewLayout === "side-by-side" \? "Below preview" : "Side by side"/);
+  assert.match(markdownChromeSource, /previewLayout === "side-by-side" \? <SplitSquareVertical size=\{16\} \/> : <SplitSquareHorizontal size=\{16\} \/>/);
+  assert.doesNotMatch(markdownEditorSource, /title="Bullet list"/);
+  assert.match(markdownChromeSource, /className=\{`markdown-body__toolbar-side \$\{showPreview \? "" : "is-disabled"\}`\.trim\(\)\}/);
+  assert.match(markdownChromeSource, /disabled=\{saveState === "saving" \|\| !showPreview\}/);
+  assert.match(markdownChromeSource, /aria-label=\{previewLayout === "side-by-side" \? "Below preview" : "Side by side"\}[\s\S]*disabled=\{saveState === "saving" \|\| !showPreview\}/);
+  assert.match(markdownChromeSource, /className="markdown-body__toolbar-side markdown-editor__toolbar-actions"/);
+  assert.match(markdownChromeSource, /className="icon-action markdown-editor__save"/);
+  assert.match(markdownChromeSource, /disabled=\{saveState === "saving" \|\| !canSave\}/);
+  assert.match(markdownChromeSource, /aria-label="Close document"/);
+  assert.match(previewFrameSource, /function SandboxedPreviewFrame\(/);
+  assert.match(previewFrameSource, /allowScripts \? "allow-scripts" : ""/);
+  assert.match(markdownContentSource, /useSandboxFrame\?: boolean;/);
+  assert.match(markdownContentSource, /buildDocumentPreviewSrcDoc\(markdown, noteSourcePath\)/);
+  assert.doesNotMatch(markdownEditorSource, /Cancel/);
+  assert.match(markdownEditorSource, /markdown-editor__split--side-by-side/);
+  assert.match(markdownEditorSource, /showPreview \? \(/);
+  assert.match(markdownEditorSource, /onScroll=\{handleEditorScroll\}/);
   assert.match(appSource, /canSave=\{isNoteDraftDirty\}/);
   assert.match(appSource, /onClose=\{\(\) => void handleCloseNoteEditor\(\)\}/);
   assert.match(appSource, /toolbarActions=\{showDetachedStandaloneNoteToolbar \? undefined : standaloneNoteViewerToolbarActions\}[\s\S]*useSandboxFrame/);
@@ -462,7 +465,7 @@ test("clicking immersive content does not force a menu state reset when bookmark
 
 test("entering edit mode preserves the current document scroll position", async () => {
   const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
-  const markdownComponentsSource = await readFile(new URL("../src/components/MarkdownComponents.tsx", import.meta.url), "utf8");
+  const markdownEditorSource = await readFile(new URL("../src/components/markdown/MarkdownEditor.tsx", import.meta.url), "utf8");
 
   assert.match(appSource, /const viewerContentRef = useRef<HTMLDivElement>\(null\);/);
   assert.match(appSource, /const \[showMarkdownEditorPreview, setShowMarkdownEditorPreview\] = useState\(getStoredMarkdownEditorPreviewVisibility\(\)\);/);
@@ -473,15 +476,15 @@ test("entering edit mode preserves the current document scroll position", async 
   assert.match(appSource, /setPendingEditorScrollRatio\(getScrollProgress\(viewerContentRef\.current\)\);/);
   assert.match(appSource, /contentRef=\{viewerContentRef\}/);
   assert.match(appSource, /initialScrollRatio=\{pendingEditorScrollRatio\}/);
-  assert.match(markdownComponentsSource, /useEffect\(\(\) => \{\s*const editorInput = editorInputRef\.current;/);
-  assert.match(markdownComponentsSource, /const hasAppliedInitialScrollRef = useRef\(false\);/);
-  assert.match(markdownComponentsSource, /if \(hasAppliedInitialScrollRef\.current\) \{\s*return;\s*\}/);
-  assert.match(markdownComponentsSource, /hasAppliedInitialScrollRef\.current = true;/);
-  assert.match(markdownComponentsSource, /editorInput\.scrollTop = initialScrollRatio \* maxEditorScrollTop;/);
-  assert.doesNotMatch(markdownComponentsSource, /\}, \[initialScrollRatio, markdown\]\);/);
-  assert.match(markdownComponentsSource, /\}, \[initialScrollRatio\]\);/);
-  assert.match(markdownComponentsSource, /getPreviewScrollTopForEditorSelection\(\{/);
-  assert.match(markdownComponentsSource, /selectionStart: editorSelection,/);
+  assert.match(markdownEditorSource, /useEffect\(\(\) => \{\s*const editorInput = editorInputRef\.current;/);
+  assert.match(markdownEditorSource, /const hasAppliedInitialScrollRef = useRef\(false\);/);
+  assert.match(markdownEditorSource, /if \(hasAppliedInitialScrollRef\.current\) \{\s*return;\s*\}/);
+  assert.match(markdownEditorSource, /hasAppliedInitialScrollRef\.current = true;/);
+  assert.match(markdownEditorSource, /editorInput\.scrollTop = initialScrollRatio \* maxEditorScrollTop;/);
+  assert.doesNotMatch(markdownEditorSource, /\}, \[initialScrollRatio, markdown\]\);/);
+  assert.match(markdownEditorSource, /\}, \[initialScrollRatio\]\);/);
+  assert.match(markdownEditorSource, /getPreviewScrollTopForEditorSelection\(\{/);
+  assert.match(markdownEditorSource, /selectionStart: formatting\.editorSelection,/);
 });
 
 test("recent entries expose a delete action", async () => {
