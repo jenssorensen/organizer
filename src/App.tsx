@@ -2436,15 +2436,38 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       ) : null}
       navigationHeaderActions={null}
       notesListHeaderActions={section === "notes" && noteCreationTarget ? (
-        <button
-          aria-label="Create document"
-          className="icon-action is-active"
-          onClick={handleCreateDocument}
-          title="Create new note"
-          type="button"
-        >
-          <FilePlus2 size={14} />
-        </button>
+        notesNavigationMode === "section" ? (
+          <>
+            <button
+              aria-label="Create folder"
+              className="icon-action is-active"
+              onClick={handleCreateFolder}
+              title={`Create folder under ${noteCreationTarget.label}`}
+              type="button"
+            >
+              <FolderPlus size={14} />
+            </button>
+            <button
+              aria-label="Create document"
+              className="icon-action is-active"
+              onClick={handleCreateDocument}
+              title="Create new note"
+              type="button"
+            >
+              <FilePlus2 size={14} />
+            </button>
+          </>
+        ) : (
+          <button
+            aria-label="Create document"
+            className="icon-action is-active"
+            onClick={handleCreateDocument}
+            title="Create new note"
+            type="button"
+          >
+            <FilePlus2 size={14} />
+          </button>
+        )
       ) : null}
       sectionsHeaderActions={section === "notes" && (notesNavigationMode === "section" || noteCreationTarget) ? (
         <button
