@@ -2434,27 +2434,48 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
           </button>
         </div>
       ) : null}
-      navigationHeaderActions={section === "notes" && noteCreationTarget ? (
-        <button
-          aria-label="Create document"
-          className="mini-action is-active note-folder-overview__header-action note-folder-overview__header-action--adaptive"
-          onClick={handleCreateDocument}
-          title={`Create in ${noteCreationTarget.label}`}
-          type="button"
-        >
-          <FilePlus2 size={14} />
-          <span className="note-folder-overview__header-action-label note-folder-overview__header-action-label--adaptive">New Document</span>
-        </button>
+      navigationHeaderActions={null}
+      notesListHeaderActions={section === "notes" && noteCreationTarget ? (
+        notesNavigationMode === "section" ? (
+          <>
+            <button
+              aria-label="Create folder"
+              className="icon-action is-active"
+              onClick={handleCreateFolder}
+              title={`Create folder under ${noteCreationTarget.label}`}
+              type="button"
+            >
+              <FolderPlus size={14} />
+            </button>
+            <button
+              aria-label="Create document"
+              className="icon-action is-active"
+              onClick={handleCreateDocument}
+              title="Create new note"
+              type="button"
+            >
+              <FilePlus2 size={14} />
+            </button>
+          </>
+        ) : (
+          <button
+            aria-label="Create document"
+            className="icon-action is-active"
+            onClick={handleCreateDocument}
+            title="Create new note"
+            type="button"
+          >
+            <FilePlus2 size={14} />
+          </button>
+        )
       ) : null}
-      sectionsHeaderActions={section === "notes" ? (
+      sectionsHeaderActions={section === "notes" && (notesNavigationMode === "section" || noteCreationTarget) ? (
         <button
           className="mini-action is-active note-folder-overview__header-action note-folder-overview__header-action--adaptive"
           onClick={notesNavigationMode === "section" ? handleCreateSection : handleCreateFolder}
           title={notesNavigationMode === "section"
             ? "Create section in data/docs"
-            : noteCreationTarget
-              ? `Create folder in ${noteCreationTarget.label}`
-              : "Create folder"
+            : `Create folder under ${noteCreationTarget.label}`
           }
           type="button"
         >

@@ -961,6 +961,7 @@ function NoteFolderOverviewPanel({
   previewContentScale = 100,
   previewSupplementary,
   navigationHeaderActions,
+  notesListHeaderActions,
   previewToolbarActions,
   previewToolbarLeading,
   sections,
@@ -1005,6 +1006,7 @@ function NoteFolderOverviewPanel({
   onToggleNoteStar: (note: Note, nextStarred: boolean) => void;
   onToggleFolder: (folderId: string) => void;
   navigationHeaderActions?: ReactNode;
+  notesListHeaderActions?: ReactNode;
   previewContentScale?: number;
   previewSupplementary?: ReactNode;
   previewToolbarActions?: ReactNode;
@@ -2025,6 +2027,9 @@ function NoteFolderOverviewPanel({
                     {sectionsHeaderLeading && showNavigationModeInNavigationHeader ? (
                       <div className="note-folder-overview__header-mode-actions">{sectionsHeaderLeading}</div>
                     ) : null}
+                    {sectionsHeaderActions && showNavigationModeInNavigationHeader ? (
+                      <div className="note-folder-overview__header-primary-actions">{sectionsHeaderActions}</div>
+                    ) : null}
                     {navigationHeaderActions ? (
                       <div className="note-folder-overview__header-primary-actions">{navigationHeaderActions}</div>
                     ) : null}
@@ -2165,41 +2170,42 @@ function NoteFolderOverviewPanel({
                   </div>
                   {!isNotesCollapsed ? (
                     <div className="note-folder-overview__section-actions">
-                      {notesNavigationMode !== "section" ? (
-                        <div className="note-folder-overview__sort-menu" ref={folderNotesSortMenuRef}>
-                          <button
-                            aria-expanded={isFolderNotesSortMenuOpen}
-                            aria-haspopup="menu"
-                            aria-label={`${sortItemsLabel}: ${activeFolderNotesSortOption.label}`}
-                            className="icon-action note-folder-overview__sort-trigger"
-                            onClick={() => setIsFolderNotesSortMenuOpen((current) => !current)}
-                            title={`${sortItemsLabel}: ${activeFolderNotesSortOption.label}`}
-                            type="button"
-                          >
-                            <ArrowUpDown size={15} />
-                          </button>
-                          {isFolderNotesSortMenuOpen ? (
-                            <div aria-label={sortItemsLabel} className="note-folder-overview__sort-popup" role="menu">
-                              {FOLDER_NOTES_SORT_OPTIONS.map((option) => (
-                                <button
-                                  key={option.value}
-                                  aria-checked={folderNotesSortMode === option.value}
-                                  className={`note-folder-overview__sort-option ${folderNotesSortMode === option.value ? "is-active" : ""}`}
-                                  onClick={() => {
-                                    setFolderNotesSortMode(option.value);
-                                    setIsFolderNotesSortMenuOpen(false);
-                                  }}
-                                  role="menuitemradio"
-                                  type="button"
-                                >
-                                  <span>{option.label}</span>
-                                  {folderNotesSortMode === option.value ? <Check size={14} /> : null}
-                                </button>
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
+                      {notesListHeaderActions ? (
+                        <div className="note-folder-overview__header-primary-actions note-folder-overview__header-primary-actions--icons-only">{notesListHeaderActions}</div>
                       ) : null}
+                      <div className="note-folder-overview__sort-menu" ref={folderNotesSortMenuRef}>
+                        <button
+                          aria-expanded={isFolderNotesSortMenuOpen}
+                          aria-haspopup="menu"
+                          aria-label={`${sortItemsLabel}: ${activeFolderNotesSortOption.label}`}
+                          className="icon-action note-folder-overview__sort-trigger"
+                          onClick={() => setIsFolderNotesSortMenuOpen((current) => !current)}
+                          title={`${sortItemsLabel}: ${activeFolderNotesSortOption.label}`}
+                          type="button"
+                        >
+                          <ArrowUpDown size={15} />
+                        </button>
+                        {isFolderNotesSortMenuOpen ? (
+                          <div aria-label={sortItemsLabel} className="note-folder-overview__sort-popup" role="menu">
+                            {FOLDER_NOTES_SORT_OPTIONS.map((option) => (
+                              <button
+                                key={option.value}
+                                aria-checked={folderNotesSortMode === option.value}
+                                className={`note-folder-overview__sort-option ${folderNotesSortMode === option.value ? "is-active" : ""}`}
+                                onClick={() => {
+                                  setFolderNotesSortMode(option.value);
+                                  setIsFolderNotesSortMenuOpen(false);
+                                }}
+                                role="menuitemradio"
+                                type="button"
+                              >
+                                <span>{option.label}</span>
+                                {folderNotesSortMode === option.value ? <Check size={14} /> : null}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
                       <div className="note-folder-overview__sort-menu" ref={folderNotesViewMenuRef}>
                         <button
                           aria-expanded={isFolderNotesViewMenuOpen}
@@ -2370,6 +2376,9 @@ function NoteFolderOverviewPanel({
                     </div>
                     {!isNotesCollapsed ? (
                       <div className="note-folder-overview__section-actions">
+                        {notesListHeaderActions ? (
+                          <div className="note-folder-overview__header-primary-actions note-folder-overview__header-primary-actions--icons-only">{notesListHeaderActions}</div>
+                        ) : null}
                         <div className="note-folder-overview__sort-menu" ref={folderNotesSortMenuRef}>
                           <button
                             aria-expanded={isFolderNotesSortMenuOpen}

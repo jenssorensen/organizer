@@ -3193,6 +3193,10 @@ button.note-breadcrumbs__item:hover {
   flex-wrap: wrap;
 }
 
+.note-folder-overview__header-primary-actions--icons-only {
+  gap: 4px;
+}
+
 .note-folder-overview__header-utility-actions {
   display: inline-flex;
   align-items: center;
