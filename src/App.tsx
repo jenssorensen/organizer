@@ -2434,27 +2434,25 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
           </button>
         </div>
       ) : null}
-      navigationHeaderActions={section === "notes" && noteCreationTarget ? (
+      navigationHeaderActions={null}
+      notesListHeaderActions={section === "notes" && noteCreationTarget ? (
         <button
           aria-label="Create document"
-          className="mini-action is-active note-folder-overview__header-action note-folder-overview__header-action--adaptive"
+          className="icon-action is-active"
           onClick={handleCreateDocument}
-          title={`Create in ${noteCreationTarget.label}`}
+          title="Create new note"
           type="button"
         >
           <FilePlus2 size={14} />
-          <span className="note-folder-overview__header-action-label note-folder-overview__header-action-label--adaptive">New Document</span>
         </button>
       ) : null}
-      sectionsHeaderActions={section === "notes" ? (
+      sectionsHeaderActions={section === "notes" && (notesNavigationMode === "section" || noteCreationTarget) ? (
         <button
           className="mini-action is-active note-folder-overview__header-action note-folder-overview__header-action--adaptive"
           onClick={notesNavigationMode === "section" ? handleCreateSection : handleCreateFolder}
           title={notesNavigationMode === "section"
             ? "Create section in data/docs"
-            : noteCreationTarget
-              ? `Create folder in ${noteCreationTarget.label}`
-              : "Create folder"
+            : `Create folder under ${noteCreationTarget.label}`
           }
           type="button"
         >
