@@ -354,7 +354,7 @@ function getSectionLabel(section: SectionId) {
   if (section === "notes") return "Notes";
   if (section === "wiki") return "Wiki";
   if (section === "bookmarks") return "Bookmarks";
-  if (section === "todo") return "TODO";
+  if (section === "todo") return "Tasks";
   if (section === "starred") return "Starred";
   return "Recent";
 }

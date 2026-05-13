@@ -140,7 +140,7 @@ export function CommandPalette({
     commands.push({
       id: "cmd-new-todo",
       label: "New task",
-      subtitle: "Add a todo item",
+      subtitle: "Add a task",
       category: "Create",
       action: () => {
         onAddTodo();

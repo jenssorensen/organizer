@@ -12,7 +12,7 @@ export function useTodoData({ apiBase, onSyncQueueChange }: { apiBase: string; o
   const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
   const [todoViewMode, setTodoViewModeState] = useState<TodoViewMode>("list");
   const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
-  const [todoStatus, setTodoStatus] = useState("Loading TODO items...");
+  const [todoStatus, setTodoStatus] = useState("Loading tasks...");
   const [hasLoadedTodoItems, setHasLoadedTodoItems] = useState(false);
   const [todoStoragePath, setTodoStoragePath] = useState<string | null>(null);
 
@@ -43,7 +43,7 @@ export function useTodoData({ apiBase, onSyncQueueChange }: { apiBase: string; o
 
       return data;
     } catch {
-      setTodoStatus("TODO API offline");
+      setTodoStatus("Tasks API offline");
       return EMPTY_TODO_PAYLOAD;
     } finally {
       setHasLoadedTodoItems(true);

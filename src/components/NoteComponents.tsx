@@ -1123,6 +1123,16 @@ function NoteFolderOverviewPanel({
     ),
     [allNotes, effectiveActiveSection, isNoteDragActive, navigationTreeNodes, navigationSortMode, navSortSnapshotKey],
   );
+  const sortedSectionNotesTreeNodes = useMemo(
+    () => sortNavigationNodes(
+      isNoteDragActive && effectiveActiveSection ? effectiveActiveSection.children : navigationTreeNodes,
+      folderNotesSortMode,
+      allNotes,
+      folderSortSnapshotViewCounts.current,
+      folderSortSnapshotRecentViewedAt.current,
+    ),
+    [allNotes, effectiveActiveSection, folderNotesSortMode, folderSortSnapshotKey, isNoteDragActive, navigationTreeNodes],
+  );
   const sortedChildNotes = useMemo(
     () => sortFolderNotes(childNotes, folderNotesSortMode, folderSortSnapshotViewCounts.current, folderSortSnapshotRecentViewedAt.current),
     [childNotes, folderNotesSortMode, folderSortSnapshotKey],
@@ -1134,6 +1144,8 @@ function NoteFolderOverviewPanel({
   }, [effectiveActiveSection, navigationSortMode, navigationTreeNodes]);
   const visibleNavigationTreeNodes = sortedNavigationTreeNodes.slice(0, visibleNavigationCount);
   const hasMoreNavigationNodes = visibleNavigationCount < sortedNavigationTreeNodes.length;
+  const visibleSectionNotesTreeNodes = sortedSectionNotesTreeNodes.slice(0, visibleNavigationCount);
+  const hasMoreSectionNotesTreeNodes = visibleNavigationCount < sortedSectionNotesTreeNodes.length;
   const CHILD_NOTES_PAGE_SIZE = 50;
   const [visibleChildCount, setVisibleChildCount] = useState(CHILD_NOTES_PAGE_SIZE);
   useEffect(() => {
@@ -2246,9 +2258,9 @@ function NoteFolderOverviewPanel({
                 {!isNotesCollapsed ? (
                   notesNavigationMode === "section" ? (
                     <div className="note-folder-overview__tree note-folder-overview__notes-tree">
-                      {sortedNavigationTreeNodes.length > 0 ? (
+                      {sortedSectionNotesTreeNodes.length > 0 ? (
                         <div className="tree-folder__children">
-                          {visibleNavigationTreeNodes.map((folderNode, index) => (
+                          {visibleSectionNotesTreeNodes.map((folderNode, index) => (
                             <NoteTreeItem
                               expandedFolderIds={expandedFolderIds}
                               foldersOnly={false}
@@ -2271,13 +2283,13 @@ function NoteFolderOverviewPanel({
                               viewMode={noteRowViewMode}
                             />
                           ))}
-                          {hasMoreNavigationNodes ? (
+                          {hasMoreSectionNotesTreeNodes ? (
                             <button
                               className="note-folder-overview__show-more"
                               onClick={() => setVisibleNavigationCount((count) => count + NAVIGATION_PAGE_SIZE)}
                               type="button"
                             >
-                              Show more ({sortedNavigationTreeNodes.length - visibleNavigationCount} remaining)
+                              Show more ({sortedSectionNotesTreeNodes.length - visibleNavigationCount} remaining)
                             </button>
                           ) : null}
                         </div>
@@ -2973,7 +2985,7 @@ function RecentDocumentCard({
 }) {
   const documentName =
     entry.kind === "todo"
-      ? entry.subtitle || "TODO"
+      ? entry.subtitle || "Task"
       : note
         ? getNoteSourceFileName(note) || entry.title
         : entry.title;

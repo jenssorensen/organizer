@@ -1,13 +1,13 @@
 # Getting Started With Organizer
 
-Organizer is a local-first workspace for markdown notes, bookmarks, recent files, and TODOs. This guide gives new users a quick path from an empty folder to a working setup.
+Organizer is a local-first workspace for markdown notes, bookmarks, recent files, and tasks. This guide gives new users a quick path from an empty folder to a working setup.
 
 ## What Organizer Can Do
 
 - Browse notes as a folder tree and a searchable note map.
 - Edit markdown files in place without moving them into a separate database.
 - Track recent documents and star important notes for quick access.
-- Manage TODO items alongside your notes.
+- Manage tasks alongside your notes.
 - Import browser bookmarks and additional note folders.
 - Restore deleted notes from Organizer's trash and review restore points.
 - Search across note titles, content, tags, and links.
@@ -24,7 +24,7 @@ Organizer is a local-first workspace for markdown notes, bookmarks, recent files
 1. Create a few markdown files in the selected folder, or open the notes you already have.
 2. Use search to confirm Organizer is indexing the files you expect.
 3. Star one or two important notes so they are easy to return to.
-4. Add a TODO item for anything you want to track separately from notes.
+4. Add a task for anything you want to track separately from notes.
 5. Import bookmarks or extra note folders if your material lives in more than one place.
 
 ## How Organizer Stores Data
@@ -40,7 +40,7 @@ your-folder/
 ```
 
 - `.organizer-data/` stores Organizer metadata such as recent items, stars, bookmarks, and saved workspace state.
-- `todo/` stores Organizer TODO data.
+- `todo/` stores Organizer task data.
 - Your markdown files remain normal files that can still be edited outside Organizer.
 
 ## Features To Try Next
