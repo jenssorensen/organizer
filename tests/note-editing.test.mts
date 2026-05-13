@@ -200,6 +200,8 @@ test("app wires the note editor controls and split layout", async () => {
   assert.match(appSource, /markdown-body__edit/);
   assert.match(appSource, /aria-label="Move to trash"/);
   assert.match(appSource, /markdown-body__close/);
+  assert.match(appSource, /const canCloseDocument = isMarkdownImmersive;/);
+  assert.match(appSource, /className="icon-action markdown-body__close"[\s\S]*disabled=\{!canCloseDocument\}/);
   assert.match(appSource, /markdown-body__toolbar-leading/);
   assert.match(appSource, /markdown-body__toolbar-title/);
   assert.match(appSource, /getNoteSourceFileName\(selectedNote\) \|\| selectedNote\.title/);
@@ -305,10 +307,14 @@ test("section view renders notes in this section as a folder tree", async () => 
 
   assert.doesNotMatch(noteComponentsSource, /sectionHeaderClassName/);
   assert.doesNotMatch(noteComponentsSource, /note-folder-overview__section-header/);
+  assert.match(noteComponentsSource, /const sortedSectionNotesTreeNodes = useMemo\(/);
+  assert.match(noteComponentsSource, /sortNavigationNodes\([\s\S]*folderNotesSortMode,[\s\S]*folderSortSnapshotViewCounts\.current,[\s\S]*folderSortSnapshotRecentViewedAt\.current/);
   assert.match(noteComponentsSource, /const directItemsHeading = notesNavigationMode === "section"/);
   assert.match(noteComponentsSource, /\$\{capitalizedItemLabelPlural\} in this section/);
   assert.match(noteComponentsSource, /notesNavigationMode === "section" \? \(/);
   assert.match(noteComponentsSource, /className="note-folder-overview__tree note-folder-overview__notes-tree"/);
+  assert.match(noteComponentsSource, /\{sortedSectionNotesTreeNodes\.length > 0 \? \(/);
+  assert.match(noteComponentsSource, /\{visibleSectionNotesTreeNodes\.map\(\(folderNode, index\) => \(/);
   assert.match(noteComponentsSource, /<NoteTreeItem[\s\S]*?foldersOnly[\s\S]*?key=\{`\$\{folderNode\.id\}:\$\{index\}`\}/);
   assert.match(noteComponentsSource, /foldersOnly=\{false\}/);
   assert.match(noteComponentsSource, /key=\{`\$\{folderNode\.id\}:notes:\$\{index\}`\}/);

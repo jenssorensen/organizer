@@ -1292,6 +1292,7 @@ function App() {
   }
 
   const notePreviewToolbarLeading = renderNoteViewerToolbarLeading();
+  const canCloseDocument = isMarkdownImmersive;
   const notePreviewToolbarActions = selectedNote ? (
     section === "bookmarks" ? null : (
       <>
@@ -1309,8 +1310,9 @@ function App() {
         <button
           aria-label="Close document"
           className="icon-action markdown-body__close"
+          disabled={!canCloseDocument}
           onClick={handleCloseSelectedNote}
-          title="Close document"
+          title={canCloseDocument ? "Close document" : "Close document is only available in immersive mode"}
           type="button"
         >
           <X size={16} />
@@ -1322,8 +1324,9 @@ function App() {
     <button
       aria-label="Close document"
       className="icon-action markdown-body__close"
+      disabled={!canCloseDocument}
       onClick={handleCloseSelectedNote}
-      title="Close document"
+      title={canCloseDocument ? "Close document" : "Close document is only available in immersive mode"}
       type="button"
     >
       <X size={16} />
@@ -1930,7 +1933,7 @@ function App() {
     () => [
       { id: "notes", label: "Notes", icon: FileCode2, count: notes.length },
       { id: "bookmarks", label: "Bookmarks", icon: Bookmark, count: bookmarks.length },
-      { id: "todo", label: "TODO", icon: LayoutList, count: openTodoItems.length },
+      { id: "todo", label: "Tasks", icon: LayoutList, count: openTodoItems.length },
       {
         id: "starred",
         label: "Starred",
@@ -2016,7 +2019,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
 
     if (section === "todo") {
       return {
-        title: selectedTodo?.title ?? "TODO workspace",
+        title: selectedTodo?.title ?? "Tasks workspace",
         eyebrow: "Task management",
         badge: `${openTodoItems.length} open · ${completedTodoItems.length} completed`,
         markdown: "",
@@ -2475,7 +2478,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
           onClick={notesNavigationMode === "section" ? handleCreateSection : handleCreateFolder}
           title={notesNavigationMode === "section"
             ? "Create section in data/docs"
-            : `Create folder under ${noteCreationTarget.label}`
+            : `Create folder under ${noteCreationTarget?.label ?? "the selected folder"}`
           }
           type="button"
         >
@@ -2821,7 +2824,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       expandNoteFolders(folderTrailIds);
     }
 
-    navigateNoteSelection(currentFolderContextNode?.id ?? ROOT_NOTE_NODE_ID);
+    setForceImmersive(false);
   }
 
   async function handleToggleNoteStar(note: Note, nextStarred: boolean) {
@@ -4455,7 +4458,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
             <Search size={18} />
             <div>
               <p className="eyebrow">Global search</p>
-              <h2>Search notes, wiki pages, bookmarks, TODO items, tags, and snippets</h2>
+              <h2>Search notes, wiki pages, bookmarks, tasks, tags, and snippets</h2>
             </div>
           </div>
 
@@ -4520,7 +4523,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
               value={searchText}
               onChange={(event) => handleSearchInputChange(event.target.value)}
               onKeyDown={handleSearchInputKeyDown}
-              placeholder="Search across notes, wiki pages, bookmarks, TODO items, tags, code snippets..."
+              placeholder="Search across notes, wiki pages, bookmarks, tasks, tags, code snippets..."
             />
             {isSearchScopePopupOpen ? (
               <div className="searchbar__popup">
@@ -4609,7 +4612,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                       onMouseEnter={() => setActiveSearchScopeSuggestionIndex(index)}
                       type="button"
                     >
-                      <span className={`category-badge is-${entry.category}`}>{entry.category}</span>
+                      <span className={`category-badge is-${entry.category}`}>{getSearchCategoryLabel(entry.category)}</span>
                       <span className="searchbar__popup-body">
                         <strong>{entry.title}</strong>
                         <span>{entry.subtitle}</span>
@@ -4679,7 +4682,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                         selectedBookmarkNode?.title ??
                         "Bookmarks"
                       : section === "todo"
-                        ? selectedTodo?.title ?? "TODO"
+                        ? selectedTodo?.title ?? "Tasks"
                       : section === "notes" || section === "wiki"
                         ? selectedNote?.title ??
                           (selectedNoteTreeNode?.type === "folder" ? selectedNoteTreeNode.title : null) ??
@@ -5125,7 +5128,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                   </div>
                   <h3>Select a notes folder first</h3>
                   <p className="muted">
-                    TODO items are stored alongside your notes. Select a notes folder from the Notes tab to get started.
+                    Tasks are stored alongside your notes. Select a notes folder from the Notes tab to get started.
                   </p>
                 </div>
               ) : (
@@ -5277,7 +5280,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                 {visibleSearchEntries.map((entry) => (
                   <article key={entry.id} className="search-hit" onClick={() => handleSearchEntrySelect(entry)}>
                     <div className="search-hit__meta">
-                      <span className={`category-badge is-${entry.category}`}>{entry.category}</span>
+                      <span className={`category-badge is-${entry.category}`}>{getSearchCategoryLabel(entry.category)}</span>
                       <span>{entry.scoreText}</span>
                     </div>
                     <h4>{entry.title}</h4>
@@ -5404,7 +5407,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                 ) : (
                   <article className="bookmark-empty">
                     <h4>No recent documents yet</h4>
-                    <p>Open notes, wiki pages, or TODO items and they will appear here.</p>
+                    <p>Open notes, wiki pages, or tasks and they will appear here.</p>
                   </article>
                 )}
               </div>
@@ -5558,7 +5561,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
               ) : (
                 <article className="bookmark-empty">
                   <h4>No recent documents yet</h4>
-                  <p>Open notes, wiki pages, or TODO items and they will appear here.</p>
+                  <p>Open notes, wiki pages, or tasks and they will appear here.</p>
                 </article>
               )}
             </div>
@@ -5605,7 +5608,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                 className="command-palette__input"
                 onChange={(event) => handleSearchInputChange(event.target.value)}
                 onKeyDown={handleSearchInputKeyDown}
-                placeholder="Search across notes, wiki pages, bookmarks, TODO items, tags, code snippets..."
+                placeholder="Search across notes, wiki pages, bookmarks, tasks, tags, code snippets..."
                 type="text"
                 value={searchText}
               />
@@ -5637,7 +5640,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                   >
                     <span className="command-palette__item-body">
                       <span className="command-palette__item-label">
-                        <span className={`category-badge is-${entry.category}`}>{entry.category}</span>
+                        <span className={`category-badge is-${entry.category}`}>{getSearchCategoryLabel(entry.category)}</span>
                         {entry.title}
                       </span>
                       <span className="command-palette__item-subtitle">{entry.subtitle}</span>
@@ -6642,10 +6645,15 @@ function getScopeLabel(scope: SectionId) {
   if (scope === "notes") return "Notes";
   if (scope === "wiki") return "Wiki";
   if (scope === "bookmarks") return "Bookmarks";
-  if (scope === "todo") return "TODO";
+  if (scope === "todo") return "Tasks";
   if (scope === "starred") return "Starred";
   if (scope === "recent") return "Recent";
   return scope;
+}
+
+function getSearchCategoryLabel(category: SearchEntry["category"]) {
+  if (category === "todo") return "tasks";
+  return category;
 }
 
 function reorderItems(order: SectionId[], source: SectionId, target: SectionId) {

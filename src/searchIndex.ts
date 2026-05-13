@@ -228,7 +228,7 @@ export function buildSearchEntries(query: string, searchIndex: SearchIndex): Sea
         { label: "priority", value: item.priority },
         { label: "tags", value: tagsText },
       ],
-      "TODO item",
+      "Task",
     ),
     targetSection: "todo",
     targetId: item.id,

@@ -4,6 +4,7 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import rehypeSlug from "rehype-slug";
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import remarkEmoji from "remark-emoji";
 import remarkGithubBlockquoteAlert from "remark-github-blockquote-alert";
 import remarkGfm from "remark-gfm";
@@ -49,6 +50,7 @@ const markdownSanitizeSchema = {
 
 const markdownRemarkPlugins: any[] = [
   remarkGfm,
+  remarkBreaks,
   remarkEmoji,
   remarkGithubBlockquoteAlert,
 ];

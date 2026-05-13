@@ -121,7 +121,7 @@ test("suggests scoped tokens after two characters", () => {
       sectionOptions: ["notes", "wiki", "bookmarks", "todo", "starred", "recent"],
       sectionScope: null,
     }).map((suggestion) => ({ kind: suggestion.kind, label: suggestion.label })),
-    [{ kind: "section", label: "TODO" }],
+    [{ kind: "section", label: "Tasks" }],
   );
 
   assert.deepEqual(

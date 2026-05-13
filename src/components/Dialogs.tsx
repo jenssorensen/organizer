@@ -1128,7 +1128,7 @@ function PreferencesDialog({
                     <div className="prefs-danger-confirm">
                       <p className="prefs-danger-confirm__warning">
                         <AlertTriangle size={14} />
-                        This will permanently delete all metadata, bookmarks, starred notes, TODO items, and configuration.
+                        This will permanently delete all metadata, bookmarks, starred notes, tasks, and configuration.
                         Your original notes and documents will not be affected. The app will reload.
                       </p>
                       <div className="prefs-danger-confirm__actions">
@@ -1234,7 +1234,7 @@ function MetaDataSetupDialog({
       <div aria-modal="true" className="dialog-card meta-data-setup" role="dialog">
         <h2>Welcome to Organizer</h2>
         <p className="meta-data-setup__description">
-          Choose a folder where Organizer will store your metadata (bookmarks, todos, starred notes, etc.).
+          Choose a folder where Organizer will store your metadata (bookmarks, tasks, starred notes, etc.).
           A subfolder called <code>organizer_meta_data</code> will be created inside your chosen location.
         </p>
 
