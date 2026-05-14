@@ -1,0 +1,24 @@
+[package]
+name = "organizer"
+version = "0.9.0"
+description = "A local-first note organizer"
+authors = ["you"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.3", features = [] }
+tauri-plugin-dialog = "2.1"
+tauri-plugin-fs = "2.1"
+tauri-plugin-shell = "2.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+notify = "6"
+chrono = "0.4"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

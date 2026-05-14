@@ -11,10 +11,12 @@
     "organizer": "./bin/organizer.mjs"
   },
   "scripts": {
-    "dev": "concurrently \"npm:dev:client\" \"npm:dev:server\"",
+    "dev": "concurrently \"npm:dev:server\" \"npm:tauri:dev\"",
     "dev:client": "vite --host 127.0.0.1",
     "dev:server": "node server/devServer.mjs",
     "build": "tsc -b && vite build",
+    "tauri:build": "tauri build",
+    "tauri:dev": "tauri dev",
     "lint": "eslint src tests vite.config.ts --max-warnings 0",
     "preview": "vite preview",
     "start": "node server/server.mjs",
@@ -22,6 +24,10 @@
     "prepack": "npm run build"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.3.0",
+    "@tauri-apps/plugin-dialog": "^2.1.0",
+    "@tauri-apps/plugin-fs": "^2.1.0",
+    "@tauri-apps/plugin-shell": "^2.1.0",
     "concurrently": "^9.2.1",
     "lucide-react": "^0.542.0",
     "mermaid": "^11.14.0",
@@ -42,6 +48,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@tauri-apps/cli": "^2.3.0",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "@types/react-syntax-highlighter": "^15.5.13",

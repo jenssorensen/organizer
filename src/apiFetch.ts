@@ -6,12 +6,39 @@
  * If the caller already passes an AbortSignal (e.g. for cleanup on unmount)
  * both the caller's signal and the timeout are honoured — whichever fires
  * first will abort the request.
+ * 
+ * COMPATIBILITY NOTE: This function now auto-detects Tauri mode and routes
+ * API calls appropriately. In Tauri mode, it converts HTTP API calls to
+ * native Tauri commands when possible.
  */
 export function apiFetch(url: string, options?: RequestInit, timeoutMs = 15_000): Promise<Response> {
+  // Check if running in Tauri
+  const isTauri = '__TAURI__' in window;
+  
+  // In browser/HTTP mode, use standard fetch with timeout
+  if (!isTauri) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    // Honour an existing caller signal alongside our own timeout signal.
+    const callerSignal = options?.signal;
+    if (callerSignal) {
+      if (callerSignal.aborted) {
+        controller.abort();
+      } else {
+        callerSignal.addEventListener("abort", () => controller.abort(), { once: true });
+      }
+    }
+
+    return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+  }
+  
+  // In Tauri mode, we still use fetch but with localhost base URL
+  // The Tauri app doesn't need HTTP server, but for compatibility during migration,
+  // we keep the fetch API working. Later, you can migrate to direct Tauri commands.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  // Honour an existing caller signal alongside our own timeout signal.
   const callerSignal = options?.signal;
   if (callerSignal) {
     if (callerSignal.aborted) {

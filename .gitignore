@@ -3,3 +3,8 @@ dist/
 node_modules/
 .organizer-data/
 .organizer-config.json
+
+# Tauri
+src-tauri/target/
+src-tauri/WixTools/
+src-tauri/*.lock

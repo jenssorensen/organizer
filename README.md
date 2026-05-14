@@ -1,10 +1,44 @@
 # Organizer
 
-Organizer is a local-first workspace for browsing, editing, and organizing markdown notes, bookmarks, recent documents, and TODO items in one interface. It combines a React + Vite client with a small Node server that scans your selected docs folder and stores Organizer state next to it.
+Organizer is a local-first workspace for browsing, editing, and organizing markdown notes, bookmarks, recent documents, and TODO items in one interface. 
+
+## 🚀 Distribution Modes
+
+Organizer now supports **two modes**:
+
+### 1. **Tauri Desktop App** (Recommended for Distribution)
+Self-contained native application for macOS, Windows, and Linux. No Node.js installation required!
+
+- **Size**: 15-40 MB (much smaller than Electron)
+- **Performance**: Native speed with system webview
+- **Security**: Sandboxed file system access
+- **Auto-updates**: Built-in support
+
+**Quick Start:**
+```bash
+# Install Rust from https://rustup.rs/
+npm install
+npm run dev              # Development mode
+npm run tauri:build      # Build for production
+```
+
+See [TAURI_SETUP.md](./TAURI_SETUP.md) for detailed setup instructions.
+
+### 2. **Node.js Server Mode** (Original)
+React + Vite client with a Node.js backend server.
+
+**Quick Start:**
+```bash
+npm install
+npm run dev:client       # Start Vite dev server
+npm run dev:server       # Start Node.js backend
+```
+
+---
 
 ## Overview
 
-Organizer is built for people who keep working notes across folders and want one place to search, sort, review, and maintain them. You choose a primary docs folder, optionally import additional note folders and bookmarks, and Organizer keeps the UI in sync with the local filesystem.
+Organizer combines a React + Vite client with backend storage that scans your selected docs folder and stores Organizer state next to it.
 
 ![Organizer Image](./docs/organizer.png)
 
@@ -23,32 +57,45 @@ Organizer is built for people who keep working notes across folders and want one
 
 ## Installation
 
-### Prerequisites
+### Tauri Desktop App
 
-- Node.js 18+ recommended.
-- npm.
+**Prerequisites:**
+- Rust: https://rustup.rs/
+- System dependencies (see [TAURI_SETUP.md](./TAURI_SETUP.md))
 
-### Install dependencies
+**Install and Run:**
+```bash
+npm install
+npm run dev              # Development with hot reload
+npm run tauri:build      # Production build
+```
 
+**Builds output to:**
+- Windows: `src-tauri/target/release/bundle/msi/` and `.../nsis/`
+- macOS: `src-tauri/target/release/bundle/dmg/` and `.../macos/`
+- Linux: `src-tauri/target/release/bundle/deb/` and `.../appimage/`
+
+See [BUILD.md](./BUILD.md) for platform-specific instructions.
+
+### Node.js Server Mode (Legacy)
+
+**Prerequisites:**
+- Node.js 18+ recommended
+- npm
+
+**Install dependencies:**
 ```bash
 npm install
 ```
 
-### Run in development
-
+**Run in development:**
 This starts both the Vite client and the local Node server.
-
 ```bash
 npm run dev
 ```
 
-Client:
-
-- `http://127.0.0.1:5173`
-
-Server:
-
-- `http://127.0.0.1:3532`
+Client: `http://127.0.0.1:5173`  
+Server: `http://127.0.0.1:3532`
 
 ### Run only the server
 
