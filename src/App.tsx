@@ -523,8 +523,8 @@ function App() {
     ? "Command palette (⌘K / ⌘⇧P)"
     : "Command palette (Ctrl+K / Ctrl+Shift+P)";
   const searchShortcutTitle = platform === "mac"
-    ? "Search (⌘F)"
-    : "Search (Ctrl+F)";
+    ? "Search (⌘S)"
+    : "Search (Ctrl+S)";
   const keyboardShortcutsTitle = platform === "mac"
     ? "Keyboard shortcuts (⌘/)"
     : "Keyboard shortcuts (Ctrl+/)";
@@ -2131,17 +2131,21 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
         return;
       }
 
-      // Cmd/Ctrl+F — search (not when collapsed search card is shown)
-      if (isMod && (event.key === "f" || event.key === "F") && !showCollapsedSearchCard) {
+      // Cmd/Ctrl+S — search (when not editing) or save note (when editing)
+      if (isMod && (event.key === "s" || event.key === "S")) {
         event.preventDefault();
-        openSearchSurface();
+        if (isNoteEditing) {
+          void handleSaveNoteEdits();
+        } else if (!showCollapsedSearchCard) {
+          openSearchSurface();
+        }
         return;
       }
 
-      // Cmd/Ctrl+S — save note when editing
-      if (isMod && (event.key === "s" || event.key === "S") && isNoteEditing) {
+      // Legacy: Cmd/Ctrl+F — still supported for search
+      if (isMod && (event.key === "f" || event.key === "F") && !showCollapsedSearchCard && !isNoteEditing) {
         event.preventDefault();
-        void handleSaveNoteEdits();
+        openSearchSurface();
         return;
       }
 
@@ -2510,6 +2514,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
         setIsVersionHistoryOpen(true);
       }}
       onSelectNote={navigateNoteSelection}
+      onStartEditing={handleStartEditingNote}
       onTogglePinnedNote={(noteId, nextPinned) => {
         if (nextPinned) {
           handlePinNote(noteId);

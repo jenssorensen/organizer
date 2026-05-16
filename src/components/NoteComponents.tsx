@@ -955,6 +955,7 @@ function NoteFolderOverviewPanel({
   onSelectNote,
   onRenameNote,
   onOpenNoteHistory,
+  onStartEditing,
   onTogglePinnedNote,
   onToggleNoteStar,
   onToggleFolder,
@@ -1002,6 +1003,7 @@ function NoteFolderOverviewPanel({
   onSelectNote: (nodeId: string | null) => void;
   onRenameNote?: (note: Note, nextFileName: string) => Promise<void> | void;
   onOpenNoteHistory?: (note: Note) => void;
+  onStartEditing?: (note: Note, nodeId: string | null) => void;
   onTogglePinnedNote?: (noteId: string, nextPinned: boolean) => void;
   onToggleNoteStar: (note: Note, nextStarred: boolean) => void;
   onToggleFolder: (folderId: string) => void;
@@ -2139,6 +2141,7 @@ function NoteFolderOverviewPanel({
                           onOpenHistory={onOpenNoteHistory}
                           onRenameFile={onRenameNote}
                           onSelect={onSelectNote}
+                          onStartEditing={onStartEditing}
                           onTogglePinned={onTogglePinnedNote}
                           onToggleStar={onToggleNoteStar}
                           onToggleFolder={onToggleFolder}
@@ -2275,6 +2278,7 @@ function NoteFolderOverviewPanel({
                               onOpenHistory={onOpenNoteHistory}
                               onRenameFile={onRenameNote}
                               onSelect={onSelectNote}
+                              onStartEditing={onStartEditing}
                               onTogglePinned={onTogglePinnedNote}
                               onToggleStar={onToggleNoteStar}
                               onToggleFolder={onToggleFolder}
@@ -2308,6 +2312,9 @@ function NoteFolderOverviewPanel({
                                 isSelected={selectedNodeId === noteItem.id}
                                 note={noteItem}
                                 onSelect={() => onSelectNote(noteItem.id)}
+                                onStartEditing={() => {
+                                  onStartEditing?.(noteItem, noteItem.id);
+                                }}
                               />
                             ) : (
                               <NoteSummaryCard
@@ -2321,6 +2328,9 @@ function NoteFolderOverviewPanel({
                                 onOpenHistory={onOpenNoteHistory ? () => onOpenNoteHistory(noteItem) : undefined}
                                 onRenameFile={onRenameNote}
                                 onSelect={() => onSelectNote(noteItem.id)}
+                                onStartEditing={() => {
+                                  onStartEditing?.(noteItem, noteItem.id);
+                                }}
                                 onTogglePinned={onTogglePinnedNote ? (nextPinned) => onTogglePinnedNote(noteItem.id, nextPinned) : undefined}
                                 onToggleStar={(nextStarred) => onToggleNoteStar(noteItem, nextStarred)}
                                 viewMode={noteRowViewMode}
@@ -2472,6 +2482,9 @@ function NoteFolderOverviewPanel({
                                 isSelected={selectedNodeId === noteItem.id}
                                 note={noteItem}
                                 onSelect={() => onSelectNote(noteItem.id)}
+                                onStartEditing={() => {
+                                  onStartEditing?.(noteItem, noteItem.id);
+                                }}
                               />
                             ) : (
                               <NoteSummaryCard
@@ -2485,6 +2498,9 @@ function NoteFolderOverviewPanel({
                                 onOpenHistory={onOpenNoteHistory ? () => onOpenNoteHistory(noteItem) : undefined}
                                 onRenameFile={onRenameNote}
                                 onSelect={() => onSelectNote(noteItem.id)}
+                                onStartEditing={() => {
+                                  onStartEditing?.(noteItem, noteItem.id);
+                                }}
                                 onTogglePinned={onTogglePinnedNote ? (nextPinned) => onTogglePinnedNote(noteItem.id, nextPinned) : undefined}
                                 onToggleStar={(nextStarred) => onToggleNoteStar(noteItem, nextStarred)}
                                 viewMode={noteRowViewMode}
@@ -2566,16 +2582,21 @@ function NoteCompactCard({
   isSelected = false,
   note,
   onSelect,
+  onStartEditing,
 }: {
   isSelected?: boolean;
   note: Note;
   onSelect: () => void;
+  onStartEditing?: () => void;
 }) {
   return (
     <div
       aria-pressed={isSelected}
       className={`note-leaf__main ${isSelected ? "is-selected" : ""}`}
       onClick={onSelect}
+      onDoubleClick={() => {
+        onStartEditing?.();
+      }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
@@ -2690,6 +2711,11 @@ function NoteSummaryCard({
         onClick={() => {
           if (!isEditingFileName) {
             onSelect();
+          }
+        }}
+        onDoubleClick={() => {
+          if (!isEditingFileName) {
+            onStartEditing?.();
           }
         }}
         onDragEnd={() => {

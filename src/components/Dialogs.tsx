@@ -1296,8 +1296,7 @@ function KeyboardShortcutsDialog({ onClose }: { onClose: () => void }) {
       description: "Always available actions for capture, search, and help.",
       shortcuts: [
         { keys: [`${modifierLabel}+K`, platform === "mac" ? "⌘⇧P" : "Ctrl+Shift+P"], description: "Open command palette" },
-        { keys: [`${modifierLabel}+F`], description: "Open search" },
-        { keys: [`${modifierLabel}+S`], description: "Save note (when editing)" },
+        { keys: [`${modifierLabel}+S`], description: "Open search / save note" },
         { keys: [`${modifierLabel}+E`], description: "Toggle edit / view mode" },
         { keys: ["Escape"], description: "Close panel / exit immersive mode" },
         { keys: [`${modifierLabel}/`], description: "Open keyboard shortcuts help" },
