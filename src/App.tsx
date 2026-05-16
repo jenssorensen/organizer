@@ -2136,7 +2136,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
         event.preventDefault();
         if (isNoteEditing) {
           void handleSaveNoteEdits();
-        } else if (!showCollapsedSearchCard) {
+        } else {
           openSearchSurface();
         }
         return;
