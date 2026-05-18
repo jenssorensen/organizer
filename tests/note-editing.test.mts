@@ -133,6 +133,7 @@ test("allows trashing local file-backed notes regardless of extension", () => {
 test("clamps the split editor divider to usable bounds", () => {
   assert.equal(clampEditorSplitPercent(12), 25);
   assert.equal(clampEditorSplitPercent(58), 58);
+  assert.equal(clampEditorSplitPercent(58.37), 58.37);
   assert.equal(clampEditorSplitPercent(91), 75);
 });
 
@@ -225,12 +226,19 @@ test("app wires the note editor controls and split layout", async () => {
   assert.match(appSource, /void handleCloseNoteEditor\(\);/);
   assert.match(markdownEditorSource, /markdown-editor/);
   assert.match(markdownEditorSource, /markdown-editor__resize-handle/);
+  assert.match(markdownEditorSource, /pendingResizePercentRef/);
+  assert.match(markdownEditorSource, /window\.requestAnimationFrame\(\(\) => \{/);
+  assert.match(markdownEditorSource, /setResizePercent\(pendingResizePercentRef\.current\);/);
   assert.match(markdownEditorSource, /markdown-editor__preview-body/);
+  assert.match(markdownEditorSource, /isImmersive\?: boolean;/);
+  assert.match(markdownEditorSource, /onEnterImmersive\?: \(\) => void;/);
   assert.match(markdownCodeMirrorSource, /spellcheck: "true"/);
   assert.match(markdownEditorSource, /canSave: boolean;/);
   assert.match(markdownChromeSource, /showPreview \? "Hide preview" : "Show preview"/);
   assert.match(markdownChromeSource, /isRevisionDiffOpen \? "Hide revision diff" : "Show revision diff"/);
   assert.match(markdownChromeSource, /focusCurrentBlockOnly \? "Show full preview" : "Focus current block"/);
+  assert.match(markdownChromeSource, /aria-label="Enter immersive mode"/);
+  assert.match(markdownChromeSource, /!isImmersive && onEnterImmersive/);
   assert.match(markdownChromeSource, /showPreview \? <EyeOff size=\{16\} \/> : <Eye size=\{16\} \/>/);
   assert.match(markdownFormattingToolbarSource, /isOutlineVisible \? "Hide outline" : "Show outline"/);
   assert.match(markdownFormattingToolbarSource, /isOutlineVisible \? <ChevronUp size=\{14\} \/> : <ChevronDown size=\{14\} \/>/);
@@ -272,6 +280,8 @@ test("app wires the note editor controls and split layout", async () => {
   assert.match(markdownEditorSource, /isOutlineVisible=\{isOutlineVisible\}/);
   assert.match(markdownEditorSource, /onToggleOutline=\{\(\) => setIsOutlineVisible\(\(current\) => !current\)\}/);
   assert.match(markdownEditorSource, /focusCurrentBlockOnly=\{focusCurrentBlockOnly\}/);
+  assert.match(markdownEditorSource, /isImmersive=\{isImmersive\}/);
+  assert.match(markdownEditorSource, /onEnterImmersive=\{onEnterImmersive\}/);
   assert.match(markdownEditorSource, /onRestoreVersion=\{handleRestoreRevision\}/);
   assert.match(markdownEditorSource, /toggleFocusedPreview: handleToggleFocusedPreview/);
   assert.match(markdownEditorSource, /cycleRevision: handleCycleRevision/);
@@ -300,6 +310,8 @@ test("app wires the note editor controls and split layout", async () => {
   assert.match(markdownEditorSource, /showPreview \? \(/);
   assert.match(markdownEditorSource, /onScroll=\{handleEditorScroll\}/);
   assert.match(appSource, /canSave=\{isNoteDraftDirty\}/);
+  assert.match(appSource, /isImmersive=\{isMarkdownImmersive\}/);
+  assert.match(appSource, /onEnterImmersive=\{\(\) => setForceImmersive\(true\)\}/);
   assert.match(appSource, /onClose=\{\(\) => void handleCloseNoteEditor\(\)\}/);
   assert.match(appSource, /toolbarActions=\{showDetachedStandaloneNoteToolbar \? undefined : standaloneNoteViewerToolbarActions\}[\s\S]*useSandboxFrame/);
   assert.match(stylesheet, /\.markdown-body__toolbar-side\.is-disabled \{[\s\S]*opacity: 0\.55;/);

@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Eye, EyeOff, History, Minus, Plus, Save, SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, History, Maximize2, Minus, Plus, Save, SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
 
 export function MarkdownEditorChrome({
   canGoBack,
@@ -6,8 +6,10 @@ export function MarkdownEditorChrome({
   canSave,
   contextLabel,
   focusCurrentBlockOnly,
+  isImmersive,
   isRevisionDiffOpen,
   onClose,
+  onEnterImmersive,
   onGoBack,
   onGoForward,
   onSave,
@@ -28,8 +30,10 @@ export function MarkdownEditorChrome({
   canSave: boolean;
   contextLabel?: string;
   focusCurrentBlockOnly: boolean;
+  isImmersive: boolean;
   isRevisionDiffOpen: boolean;
   onClose: () => void;
+  onEnterImmersive?: () => void;
   onGoBack?: () => void;
   onGoForward?: () => void;
   onSave: () => void;
@@ -155,6 +159,18 @@ export function MarkdownEditorChrome({
           >
             <Save size={16} />
           </button>
+          {!isImmersive && onEnterImmersive ? (
+            <button
+              aria-label="Enter immersive mode"
+              className="icon-action"
+              disabled={saveState === "saving"}
+              onClick={onEnterImmersive}
+              title="Enter immersive mode"
+              type="button"
+            >
+              <Maximize2 size={16} />
+            </button>
+          ) : null}
           <button
             aria-label="Close document"
             className="icon-action markdown-body__close"

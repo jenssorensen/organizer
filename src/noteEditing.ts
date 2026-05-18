@@ -35,7 +35,8 @@ export function clampEditorSplitPercent(percent: number) {
     return 50;
   }
 
-  return Math.min(MAX_EDITOR_SPLIT_PERCENT, Math.max(MIN_EDITOR_SPLIT_PERCENT, Math.round(percent)));
+  const clampedPercent = Math.min(MAX_EDITOR_SPLIT_PERCENT, Math.max(MIN_EDITOR_SPLIT_PERCENT, percent));
+  return Math.round(clampedPercent * 100) / 100;
 }
 
 export function getSyncedPreviewScrollTop({
