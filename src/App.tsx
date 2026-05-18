@@ -4769,7 +4769,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
               section === "bookmarks" ? "hero-card--menu" : ""
             } ${isMarkdownImmersive ? "is-immersive" : ""}`}
           >
-            {((section === "notes" || section === "wiki") && hasLoadedNotes && notes.length === 0) || (section === "bookmarks" && hasLoadedBookmarks && bookmarkTree.length === 0) ? null : (
+            {((section === "notes" || section === "wiki") && hasLoadedNotes && notes.length === 0) || (section === "bookmarks" && hasLoadedBookmarks && bookmarkTree.length === 0) ? null : !((section === "notes" || section === "wiki") && isNoteEditing) ? (
             <div className={`card__header ${section === "notes" || section === "todo" || section === "starred" || section === "recent" ? "hero-card__header--divided" : ""}`.trim()}>
               <div className="hero-card__header-main">
                 <div aria-label="Navigation history" className="history-rail" role="group">
@@ -4818,7 +4818,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                           (section === "wiki" ? "Wiki map" : "Notes map")
                         : viewerContent.title}
                   </h3>
-                  {section === "notes" || section === "wiki" ? (
+                  {section === "notes" || section === "wiki" ? !isNoteEditing ? (
                     <div className="hero-card__header-subcopy hero-card__header-subcopy--notes">
                         <button
                           aria-label="Open folder in file manager"
@@ -4841,7 +4841,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                               : "Focus view"}
                       </span>
                     </div>
-                  ) : null}
+                  ) : null : null}
                   {section === "todo" && todoStoragePath ? (
                     <div className="hero-card__header-subcopy hero-card__header-subcopy--notes">
                       <button
@@ -4943,14 +4943,9 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                     </button>
                   </div>
                 </div>
-              ) : (
-                <span className="status-pill">
-                  <FileCode2 size={14} />
-                  {viewerContent.badge}
-                </span>
-              )}
+              ) : null}
             </div>
-            )}
+            ) : null}
 
             {section === "bookmarks" ? (
               hasLoadedBookmarks && bookmarkTree.length === 0 ? (
@@ -5146,9 +5141,18 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                             <MarkdownEditor
                               allowIframeScripts={prefs.allowIframeScripts}
                               backlinks={prefs.showBacklinks ? backlinks : []}
+                              canGoBack={canGoBack}
+                              canGoForward={canGoForward}
                               canSave={isNoteDraftDirty}
                               documentPath={selectedNote.sourcePath || selectedNote.title}
                               draftStatus={editorDraftStatus}
+                              editorContextLabel={section === "notes" && notesNavigationMode === "section" && activeNoteSection
+                                ? `Section: ${activeNoteSection.title}`
+                                : section === "notes" && noteCreationTarget
+                                  ? `Target: ${noteCreationTarget.label}`
+                                  : query.trim()
+                                    ? "Filtered by search"
+                                    : "Focus view"}
                               noteSourcePath={selectedNote.sourcePath}
                               initialScrollRatio={pendingEditorScrollRatio}
                               markdown={noteDraft}
@@ -5156,6 +5160,11 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                               onClose={() => void handleCloseNoteEditor()}
                               onChange={setNoteDraft}
                               onCreateMissingNote={(label) => void handleCreateMissingLinkedNote(label)}
+                              onGoBack={() => handleHistoryNavigation(-1)}
+                              onGoForward={() => handleHistoryNavigation(1)}
+                              onOpenDocumentFolder={() => {
+                                void handleOpenCurrentNotesFolder();
+                              }}
                               onOpenBacklink={openNote}
                               onZoomIn={handleViewerZoomIn}
                               onZoomOut={handleViewerZoomOut}
