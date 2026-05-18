@@ -1,10 +1,15 @@
-import { Eye, EyeOff, History, Minus, Plus, Save, SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, History, Minus, Plus, Save, SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
 
 export function MarkdownEditorChrome({
+  canGoBack,
+  canGoForward,
   canSave,
+  contextLabel,
   focusCurrentBlockOnly,
   isRevisionDiffOpen,
   onClose,
+  onGoBack,
+  onGoForward,
   onSave,
   onToggleFocusCurrentBlock,
   onToggleRevisionDiff,
@@ -18,10 +23,15 @@ export function MarkdownEditorChrome({
   setShowPreview,
   showPreview,
 }: {
+  canGoBack?: boolean;
+  canGoForward?: boolean;
   canSave: boolean;
+  contextLabel?: string;
   focusCurrentBlockOnly: boolean;
   isRevisionDiffOpen: boolean;
   onClose: () => void;
+  onGoBack?: () => void;
+  onGoForward?: () => void;
   onSave: () => void;
   onToggleFocusCurrentBlock: () => void;
   onToggleRevisionDiff: () => void;
@@ -37,95 +47,125 @@ export function MarkdownEditorChrome({
 }) {
   return (
     <div className="markdown-body__toolbar markdown-editor__toolbar">
-      <div className="markdown-body__toolbar-side">
-        <button
-          aria-label={showPreview ? "Hide preview" : "Show preview"}
-          className="mini-action"
-          disabled={saveState === "saving"}
-          onClick={onTogglePreview ?? (() => setShowPreview((current) => !current))}
-          title={showPreview ? "Hide preview" : "Show preview"}
-          type="button"
-        >
-          {showPreview ? <EyeOff size={16} /> : <Eye size={16} />}
-          {showPreview ? "Hide preview" : "Show preview"}
-        </button>
-        <button
-          aria-label={previewLayout === "side-by-side" ? "Below preview" : "Side by side"}
-          className="mini-action"
-          disabled={saveState === "saving" || !showPreview}
-          onClick={onTogglePreviewLayout ?? (() => undefined)}
-          title={previewLayout === "side-by-side" ? "Switch to below preview" : "Switch to side-by-side preview"}
-          type="button"
-        >
-          {previewLayout === "side-by-side" ? <SplitSquareVertical size={16} /> : <SplitSquareHorizontal size={16} />}
-          {previewLayout === "side-by-side" ? "Below preview" : "Side by side"}
-        </button>
-        <button
-          aria-label={isRevisionDiffOpen ? "Hide revision diff" : "Show revision diff"}
-          className="mini-action"
-          disabled={saveState === "saving"}
-          onClick={onToggleRevisionDiff}
-          title={isRevisionDiffOpen ? "Hide revision diff" : "Show revision diff"}
-          type="button"
-        >
-          <History size={16} />
-          {isRevisionDiffOpen ? "Hide diff" : "Revision diff"}
-        </button>
-        <button
-          aria-label={focusCurrentBlockOnly ? "Show full preview" : "Focus current block"}
-          className="mini-action"
-          disabled={saveState === "saving" || !showPreview || isRevisionDiffOpen}
-          onClick={onToggleFocusCurrentBlock}
-          title={focusCurrentBlockOnly ? "Show full preview" : "Focus current block"}
-          type="button"
-        >
-          {focusCurrentBlockOnly ? "Full preview" : "Focus block"}
-        </button>
-      </div>
-      <div className="markdown-body__toolbar-side markdown-editor__toolbar-actions">
-        <div className={`markdown-body__toolbar-side ${showPreview ? "" : "is-disabled"}`.trim()}>
+      {onGoBack || onGoForward ? (
+        <div aria-label="Navigation history" className="history-rail markdown-editor__history" role="group">
           <button
-            aria-label="Zoom out"
-            className="icon-action markdown-body__zoom"
-            disabled={saveState === "saving" || !showPreview}
-            onClick={onZoomOut}
-            title="Zoom out"
+            aria-label="Go back"
+            className="history-action"
+            disabled={!canGoBack || saveState === "saving"}
+            onClick={onGoBack}
             type="button"
           >
-            <Minus size={16} />
+            <ChevronLeft size={16} />
           </button>
-          <span className="markdown-body__zoom-value">{previewContentScale}%</span>
           <button
-            aria-label="Zoom in"
-            className="icon-action markdown-body__zoom"
-            disabled={saveState === "saving" || !showPreview}
-            onClick={onZoomIn}
-            title="Zoom in"
+            aria-label="Go forward"
+            className="history-action"
+            disabled={!canGoForward || saveState === "saving"}
+            onClick={onGoForward}
             type="button"
           >
-            <Plus size={16} />
+            <ChevronRight size={16} />
           </button>
         </div>
-        <button
-          aria-label="Save note"
-          className="icon-action markdown-editor__save"
-          disabled={saveState === "saving" || !canSave}
-          onClick={onSave}
-          title={saveState === "saving" ? "Saving note" : canSave ? "Save note" : "No changes to save"}
-          type="button"
-        >
-          <Save size={16} />
-        </button>
-        <button
-          aria-label="Close document"
-          className="icon-action markdown-body__close"
-          disabled={saveState === "saving"}
-          onClick={onClose}
-          title="Close document"
-          type="button"
-        >
-          <X size={16} />
-        </button>
+      ) : null}
+      {contextLabel ? (
+        <div className="markdown-body__toolbar-side markdown-editor__toolbar-context">
+          <span className="markdown-editor__toolbar-context-text" title={contextLabel}>{contextLabel}</span>
+        </div>
+      ) : null}
+      <div className="markdown-body__toolbar-side markdown-editor__toolbar-trailing">
+        <div className="markdown-body__toolbar-side markdown-editor__toolbar-primary">
+          <button
+            aria-label={showPreview ? "Hide preview" : "Show preview"}
+            className="mini-action"
+            disabled={saveState === "saving"}
+            onClick={onTogglePreview ?? (() => setShowPreview((current) => !current))}
+            title={showPreview ? "Hide preview" : "Show preview"}
+            type="button"
+          >
+            {showPreview ? <EyeOff size={16} /> : <Eye size={16} />}
+            {showPreview ? "Hide preview" : "Show preview"}
+          </button>
+          <button
+            aria-label={previewLayout === "side-by-side" ? "Below preview" : "Side by side"}
+            className="mini-action"
+            disabled={saveState === "saving" || !showPreview}
+            onClick={onTogglePreviewLayout ?? (() => undefined)}
+            title={previewLayout === "side-by-side" ? "Switch to below preview" : "Switch to side-by-side preview"}
+            type="button"
+          >
+            {previewLayout === "side-by-side" ? <SplitSquareVertical size={16} /> : <SplitSquareHorizontal size={16} />}
+            {previewLayout === "side-by-side" ? "Below preview" : "Side by side"}
+          </button>
+          <button
+            aria-label={isRevisionDiffOpen ? "Hide revision diff" : "Show revision diff"}
+            className="mini-action"
+            disabled={saveState === "saving"}
+            onClick={onToggleRevisionDiff}
+            title={isRevisionDiffOpen ? "Hide revision diff" : "Show revision diff"}
+            type="button"
+          >
+            <History size={16} />
+            {isRevisionDiffOpen ? "Hide diff" : "Revision diff"}
+          </button>
+          <button
+            aria-label={focusCurrentBlockOnly ? "Show full preview" : "Focus current block"}
+            className="mini-action"
+            disabled={saveState === "saving" || !showPreview || isRevisionDiffOpen}
+            onClick={onToggleFocusCurrentBlock}
+            title={focusCurrentBlockOnly ? "Show full preview" : "Focus current block"}
+            type="button"
+          >
+            {focusCurrentBlockOnly ? "Full preview" : "Focus block"}
+          </button>
+        </div>
+        <span aria-hidden="true" className="markdown-editor__toolbar-divider" />
+        <div className="markdown-body__toolbar-side markdown-editor__toolbar-actions">
+          <div className={`markdown-body__toolbar-side ${showPreview ? "" : "is-disabled"}`.trim()}>
+            <button
+              aria-label="Zoom out"
+              className="icon-action markdown-body__zoom"
+              disabled={saveState === "saving" || !showPreview}
+              onClick={onZoomOut}
+              title="Zoom out"
+              type="button"
+            >
+              <Minus size={16} />
+            </button>
+            <span className="markdown-body__zoom-value">{previewContentScale}%</span>
+            <button
+              aria-label="Zoom in"
+              className="icon-action markdown-body__zoom"
+              disabled={saveState === "saving" || !showPreview}
+              onClick={onZoomIn}
+              title="Zoom in"
+              type="button"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+          <button
+            aria-label="Save note"
+            className="icon-action markdown-editor__save"
+            disabled={saveState === "saving" || !canSave}
+            onClick={onSave}
+            title={saveState === "saving" ? "Saving note" : canSave ? "Save note" : "No changes to save"}
+            type="button"
+          >
+            <Save size={16} />
+          </button>
+          <button
+            aria-label="Close document"
+            className="icon-action markdown-body__close"
+            disabled={saveState === "saving"}
+            onClick={onClose}
+            title="Close document"
+            type="button"
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
     </div>
   );

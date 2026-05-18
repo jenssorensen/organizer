@@ -811,7 +811,6 @@ a {
 
 .hero-card__header--divided {
   align-items: flex-start;
-  min-height: 92px;
   padding-bottom: 18px;
   margin-bottom: 18px;
   border-bottom: 1px solid rgba(136, 167, 209, 0.12);
@@ -2345,8 +2344,65 @@ button.note-breadcrumbs__item:hover {
   gap: 8px;
 }
 
-.markdown-editor__toolbar-actions {
+.markdown-editor__toolbar .mini-action,
+.markdown-editor__toolbar .icon-action,
+.markdown-editor__toolbar .history-action {
+  box-sizing: border-box;
+  min-height: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.markdown-editor__toolbar .mini-action {
+  padding: 6px 10px;
+  font-size: 0.9rem;
+}
+
+.markdown-editor__toolbar .icon-action,
+.markdown-editor__toolbar .history-action {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+}
+
+.markdown-editor__history {
+  margin-right: 4px;
+}
+
+.markdown-editor__toolbar-context {
+  min-width: 0;
+  margin-right: auto;
+}
+
+.markdown-editor__toolbar-trailing {
   margin-left: auto;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.markdown-editor__toolbar-primary {
+  justify-content: flex-end;
+}
+
+.markdown-editor__toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(136, 167, 209, 0.22);
+  flex: 0 0 auto;
+}
+
+.markdown-editor__toolbar-context-text {
+  max-width: 100%;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.markdown-editor__toolbar-actions {
+  flex: 0 0 auto;
 }
 
 .markdown-editor__save {
@@ -2392,9 +2448,56 @@ button.note-breadcrumbs__item:hover {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
+  min-height: 44px;
+  padding: 10px 12px;
   border-bottom: 1px solid rgba(136, 167, 209, 0.12);
   background: rgba(255, 255, 255, 0.03);
+}
+
+.markdown-editor__pane-header .status-pill {
+  padding: 0;
+  font-size: 0.82rem;
+}
+
+.markdown-editor__pane-header--input {
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.markdown-editor__pane-header-trailing {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+  margin-left: auto;
+}
+
+.markdown-editor__pane-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  position: relative;
+  overflow: hidden;
+}
+
+.markdown-editor__pane-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(136, 167, 209, 0.22);
+  flex: 0 0 auto;
+}
+
+.markdown-editor__document-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 1 340px;
 }
 
 .markdown-format-toolbar {
@@ -2706,6 +2809,7 @@ button.note-breadcrumbs__item:hover {
 
 .markdown-editor__document-path {
   min-width: 0;
+  flex: 1 1 auto;
   color: var(--muted);
   font-family: var(--font-mono);
   font-size: 0.82rem;
@@ -2714,27 +2818,68 @@ button.note-breadcrumbs__item:hover {
   text-overflow: ellipsis;
 }
 
+.markdown-editor__document-folder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.markdown-editor__document-folder:hover,
+.markdown-editor__document-folder:focus-visible {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  outline: none;
+}
+
 .markdown-editor__pane-meta {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex: 0 0 auto;
 }
 
 .markdown-editor__breadcrumbs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 12px 0;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  margin-left: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0;
+  scrollbar-width: none;
+}
+
+.markdown-editor__breadcrumbs.is-hidden {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.markdown-editor__breadcrumbs::-webkit-scrollbar {
+  display: none;
 }
 
 .markdown-editor__breadcrumb {
-  min-height: 28px;
-  padding: 0 10px;
+  min-height: 24px;
+  padding: 0 8px;
   border: 1px solid rgba(136, 167, 209, 0.14);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.03);
   color: var(--muted);
   font: 600 0.78rem/1 var(--font-sans);
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .markdown-editor__breadcrumb:hover,

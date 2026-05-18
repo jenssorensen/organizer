@@ -1,3 +1,4 @@
+import { FolderOpen } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 
 import type { Note } from "../../types";
@@ -37,7 +38,10 @@ function getStoredMarkdownEditorOutlineVisibility() {
 
 export function MarkdownEditor({
   allowIframeScripts = false,
+  canGoBack = false,
+  canGoForward = false,
   documentPath,
+  editorContextLabel,
   noteSourcePath,
   notes,
   backlinks,
@@ -47,6 +51,9 @@ export function MarkdownEditor({
   onChange,
   onClose,
   onCreateMissingNote,
+  onGoBack,
+  onGoForward,
+  onOpenDocumentFolder,
   onOpenBacklink,
   onZoomIn,
   onZoomOut,
@@ -63,7 +70,10 @@ export function MarkdownEditor({
   saveError,
 }: {
   allowIframeScripts?: boolean;
+  canGoBack?: boolean;
+  canGoForward?: boolean;
   documentPath: string;
+  editorContextLabel?: string;
   noteSourcePath?: string;
   notes: Note[];
   backlinks: Note[];
@@ -73,6 +83,9 @@ export function MarkdownEditor({
   onChange: (value: string) => void;
   onClose: () => void;
   onCreateMissingNote?: (label: string) => void;
+  onGoBack?: () => void;
+  onGoForward?: () => void;
+  onOpenDocumentFolder?: () => void;
   onOpenBacklink: (note: Note) => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -93,6 +106,9 @@ export function MarkdownEditor({
   const editorInputRef = useRef<MarkdownCodeMirrorHandle>(null);
   const previewBodyRef = useRef<HTMLDivElement>(null);
   const actionPaletteInputRef = useRef<HTMLInputElement>(null);
+  const paneHeadingRef = useRef<HTMLDivElement>(null);
+  const documentHeadingRef = useRef<HTMLDivElement>(null);
+  const breadcrumbsRef = useRef<HTMLDivElement>(null);
   const [isResizing, setIsResizing] = useState(false);
   const [linkEditorUrl, setLinkEditorUrl] = useState("");
   const [isActionPaletteOpen, setIsActionPaletteOpen] = useState(false);
@@ -102,6 +118,7 @@ export function MarkdownEditor({
   const [focusCurrentBlockOnly, setFocusCurrentBlockOnly] = useState(false);
   const [isRevisionDiffOpen, setIsRevisionDiffOpen] = useState(false);
   const [selectedRevisionIndex, setSelectedRevisionIndex] = useState<number | null>(null);
+  const [hideBreadcrumbs, setHideBreadcrumbs] = useState(false);
   const popovers = useMarkdownEditorPopovers({ editorRootRef });
   const formatting = useMarkdownEditorFormatting({
     markdown,
@@ -160,6 +177,54 @@ export function MarkdownEditor({
     () => buildOutlineBreadcrumbs(outlineEntries, activeOutlineEntryId),
     [activeOutlineEntryId, outlineEntries],
   );
+
+  useEffect(() => {
+    if (activeBreadcrumbs.length === 0) {
+      setHideBreadcrumbs(false);
+      return;
+    }
+
+    function updateBreadcrumbVisibility() {
+      const headingElement = paneHeadingRef.current;
+      const documentElement = documentHeadingRef.current;
+      const breadcrumbsElement = breadcrumbsRef.current;
+
+      if (!headingElement || !documentElement || !breadcrumbsElement) {
+        return;
+      }
+
+      const availableWidth = headingElement.clientWidth - documentElement.offsetWidth - 10;
+      setHideBreadcrumbs(breadcrumbsElement.scrollWidth > Math.max(availableWidth, 0));
+    }
+
+    updateBreadcrumbVisibility();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateBreadcrumbVisibility);
+      return () => window.removeEventListener("resize", updateBreadcrumbVisibility);
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateBreadcrumbVisibility();
+    });
+
+    if (paneHeadingRef.current) {
+      resizeObserver.observe(paneHeadingRef.current);
+    }
+
+    if (documentHeadingRef.current) {
+      resizeObserver.observe(documentHeadingRef.current);
+    }
+
+    if (breadcrumbsRef.current) {
+      resizeObserver.observe(breadcrumbsRef.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [activeBreadcrumbs]);
+
   const noteVersions = useMemo(
     () => (noteSourcePath ? loadNoteVersionHistory(noteSourcePath) : []),
     [noteSourcePath, saveState],
@@ -414,10 +479,15 @@ export function MarkdownEditor({
   return (
     <div className="markdown-editor" ref={editorRootRef}>
       <MarkdownEditorChrome
+        canGoBack={canGoBack}
+        canGoForward={canGoForward}
         canSave={canSave}
+        contextLabel={editorContextLabel}
         focusCurrentBlockOnly={focusCurrentBlockOnly}
         isRevisionDiffOpen={isRevisionDiffOpen}
         onClose={onClose}
+        onGoBack={onGoBack}
+        onGoForward={onGoForward}
         onSave={onSave}
         onToggleFocusCurrentBlock={handleToggleFocusedPreview}
         onTogglePreview={() => {
@@ -448,27 +518,50 @@ export function MarkdownEditor({
         style={showPreview ? layoutStyle : undefined}
       >
         <section className="markdown-editor__pane markdown-editor__pane--input">
-          <div className="markdown-editor__pane-header">
-            <span className="markdown-editor__document-path" title={documentPath}>{documentPath}</span>
-            <div className="markdown-editor__pane-meta">
-              {draftStatusLabel ? <span className="status-pill subtle">{draftStatusLabel}</span> : null}
-              <span className="muted">{markdown.length} chars</span>
+          <div className="markdown-editor__pane-header markdown-editor__pane-header--input">
+            <div className="markdown-editor__pane-header-trailing">
+              <div className="markdown-editor__pane-heading" ref={paneHeadingRef}>
+                <div className="markdown-editor__document-heading" ref={documentHeadingRef}>
+                  {onOpenDocumentFolder ? (
+                    <button
+                      aria-label="Open folder in file manager"
+                      className="markdown-editor__document-folder"
+                      onClick={onOpenDocumentFolder}
+                      title="Open folder in file manager"
+                      type="button"
+                    >
+                      <FolderOpen size={14} />
+                    </button>
+                  ) : null}
+                  <span className="markdown-editor__document-path" title={documentPath}>{documentPath}</span>
+                </div>
+                {activeBreadcrumbs.length > 0 ? (
+                  <div
+                    aria-hidden={hideBreadcrumbs}
+                    className={`markdown-editor__breadcrumbs ${hideBreadcrumbs ? "is-hidden" : ""}`}
+                    aria-label="Current section"
+                    ref={breadcrumbsRef}
+                  >
+                    {activeBreadcrumbs.map((entry) => (
+                      <button
+                        className={`markdown-editor__breadcrumb ${entry.id === activeOutlineEntryId ? "is-active" : ""}`}
+                        key={entry.id}
+                        onClick={() => handleSelectOutlineEntry(entry)}
+                        type="button"
+                      >
+                        {entry.title}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <span aria-hidden="true" className="markdown-editor__pane-divider" />
+              <div className="markdown-editor__pane-meta">
+                {draftStatusLabel ? <span className="status-pill subtle">{draftStatusLabel}</span> : null}
+                <span className="muted">{markdown.length} chars</span>
+              </div>
             </div>
           </div>
-          {activeBreadcrumbs.length > 0 ? (
-            <div className="markdown-editor__breadcrumbs" aria-label="Current section">
-              {activeBreadcrumbs.map((entry) => (
-                <button
-                  className={`markdown-editor__breadcrumb ${entry.id === activeOutlineEntryId ? "is-active" : ""}`}
-                  key={entry.id}
-                  onClick={() => handleSelectOutlineEntry(entry)}
-                  type="button"
-                >
-                  {entry.title}
-                </button>
-              ))}
-            </div>
-          ) : null}
           {isActionPaletteOpen ? (
             <section className="markdown-editor__action-palette" aria-label="Selection actions">
               <div className="markdown-editor__action-palette-header">
