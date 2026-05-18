@@ -42,6 +42,7 @@ export function MarkdownEditor({
   canGoForward = false,
   documentPath,
   editorContextLabel,
+  isImmersive = false,
   noteSourcePath,
   notes,
   backlinks,
@@ -51,6 +52,7 @@ export function MarkdownEditor({
   onChange,
   onClose,
   onCreateMissingNote,
+  onEnterImmersive,
   onGoBack,
   onGoForward,
   onOpenDocumentFolder,
@@ -74,6 +76,7 @@ export function MarkdownEditor({
   canGoForward?: boolean;
   documentPath: string;
   editorContextLabel?: string;
+  isImmersive?: boolean;
   noteSourcePath?: string;
   notes: Note[];
   backlinks: Note[];
@@ -83,6 +86,7 @@ export function MarkdownEditor({
   onChange: (value: string) => void;
   onClose: () => void;
   onCreateMissingNote?: (label: string) => void;
+  onEnterImmersive?: () => void;
   onGoBack?: () => void;
   onGoForward?: () => void;
   onOpenDocumentFolder?: () => void;
@@ -109,6 +113,8 @@ export function MarkdownEditor({
   const paneHeadingRef = useRef<HTMLDivElement>(null);
   const documentHeadingRef = useRef<HTMLDivElement>(null);
   const breadcrumbsRef = useRef<HTMLDivElement>(null);
+  const pendingResizePercentRef = useRef(resizePercent);
+  const resizeFrameRef = useRef<number | null>(null);
   const [isResizing, setIsResizing] = useState(false);
   const [linkEditorUrl, setLinkEditorUrl] = useState("");
   const [isActionPaletteOpen, setIsActionPaletteOpen] = useState(false);
@@ -282,8 +288,32 @@ export function MarkdownEditor({
   }, [actionPaletteActions.length, activeActionIndex]);
 
   useEffect(() => {
+    pendingResizePercentRef.current = resizePercent;
+  }, [resizePercent]);
+
+  useEffect(() => () => {
+    if (resizeFrameRef.current !== null) {
+      window.cancelAnimationFrame(resizeFrameRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!isResizing) {
       return;
+    }
+
+    function applyResizePercent(nextPercent: number) {
+      const splitElement = splitRef.current;
+      if (!splitElement) {
+        return;
+      }
+
+      if (previewLayout === "side-by-side") {
+        splitElement.style.gridTemplateColumns = `minmax(280px, ${nextPercent}fr) auto minmax(280px, ${100 - nextPercent}fr)`;
+        return;
+      }
+
+      splitElement.style.gridTemplateRows = `minmax(160px, ${nextPercent}fr) auto minmax(160px, ${100 - nextPercent}fr)`;
     }
 
     function handlePointerMove(event: PointerEvent) {
@@ -295,10 +325,24 @@ export function MarkdownEditor({
       const nextPercent = previewLayout === "side-by-side"
         ? ((event.clientX - bounds.left) / bounds.width) * 100
         : ((event.clientY - bounds.top) / bounds.height) * 100;
-      setResizePercent(clampEditorSplitPercent(nextPercent));
+      pendingResizePercentRef.current = clampEditorSplitPercent(nextPercent);
+      if (resizeFrameRef.current !== null) {
+        return;
+      }
+
+      resizeFrameRef.current = window.requestAnimationFrame(() => {
+        resizeFrameRef.current = null;
+        applyResizePercent(pendingResizePercentRef.current);
+      });
     }
 
     function handlePointerUp() {
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+        resizeFrameRef.current = null;
+      }
+
+      setResizePercent(pendingResizePercentRef.current);
       setIsResizing(false);
     }
 
@@ -306,6 +350,11 @@ export function MarkdownEditor({
     window.addEventListener("pointerup", handlePointerUp);
 
     return () => {
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+        resizeFrameRef.current = null;
+      }
+
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
@@ -484,8 +533,10 @@ export function MarkdownEditor({
         canSave={canSave}
         contextLabel={editorContextLabel}
         focusCurrentBlockOnly={focusCurrentBlockOnly}
+        isImmersive={isImmersive}
         isRevisionDiffOpen={isRevisionDiffOpen}
         onClose={onClose}
+        onEnterImmersive={onEnterImmersive}
         onGoBack={onGoBack}
         onGoForward={onGoForward}
         onSave={onSave}

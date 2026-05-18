@@ -5153,6 +5153,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                                   : query.trim()
                                     ? "Filtered by search"
                                     : "Focus view"}
+                              isImmersive={isMarkdownImmersive}
                               noteSourcePath={selectedNote.sourcePath}
                               initialScrollRatio={pendingEditorScrollRatio}
                               markdown={noteDraft}
@@ -5160,6 +5161,7 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                               onClose={() => void handleCloseNoteEditor()}
                               onChange={setNoteDraft}
                               onCreateMissingNote={(label) => void handleCreateMissingLinkedNote(label)}
+                              onEnterImmersive={() => setForceImmersive(true)}
                               onGoBack={() => handleHistoryNavigation(-1)}
                               onGoForward={() => handleHistoryNavigation(1)}
                               onOpenDocumentFolder={() => {
