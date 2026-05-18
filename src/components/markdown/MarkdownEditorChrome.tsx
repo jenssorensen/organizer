@@ -1,9 +1,13 @@
-import { Eye, EyeOff, Minus, Plus, Save, SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
+import { Eye, EyeOff, History, Minus, Plus, Save, SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
 
 export function MarkdownEditorChrome({
   canSave,
+  focusCurrentBlockOnly,
+  isRevisionDiffOpen,
   onClose,
   onSave,
+  onToggleFocusCurrentBlock,
+  onToggleRevisionDiff,
   onTogglePreview,
   onTogglePreviewLayout,
   onZoomIn,
@@ -15,8 +19,12 @@ export function MarkdownEditorChrome({
   showPreview,
 }: {
   canSave: boolean;
+  focusCurrentBlockOnly: boolean;
+  isRevisionDiffOpen: boolean;
   onClose: () => void;
   onSave: () => void;
+  onToggleFocusCurrentBlock: () => void;
+  onToggleRevisionDiff: () => void;
   onTogglePreview?: () => void;
   onTogglePreviewLayout?: () => void;
   onZoomIn: () => void;
@@ -51,6 +59,27 @@ export function MarkdownEditorChrome({
         >
           {previewLayout === "side-by-side" ? <SplitSquareVertical size={16} /> : <SplitSquareHorizontal size={16} />}
           {previewLayout === "side-by-side" ? "Below preview" : "Side by side"}
+        </button>
+        <button
+          aria-label={isRevisionDiffOpen ? "Hide revision diff" : "Show revision diff"}
+          className="mini-action"
+          disabled={saveState === "saving"}
+          onClick={onToggleRevisionDiff}
+          title={isRevisionDiffOpen ? "Hide revision diff" : "Show revision diff"}
+          type="button"
+        >
+          <History size={16} />
+          {isRevisionDiffOpen ? "Hide diff" : "Revision diff"}
+        </button>
+        <button
+          aria-label={focusCurrentBlockOnly ? "Show full preview" : "Focus current block"}
+          className="mini-action"
+          disabled={saveState === "saving" || !showPreview || isRevisionDiffOpen}
+          onClick={onToggleFocusCurrentBlock}
+          title={focusCurrentBlockOnly ? "Show full preview" : "Focus current block"}
+          type="button"
+        >
+          {focusCurrentBlockOnly ? "Full preview" : "Focus block"}
         </button>
       </div>
       <div className="markdown-body__toolbar-side markdown-editor__toolbar-actions">

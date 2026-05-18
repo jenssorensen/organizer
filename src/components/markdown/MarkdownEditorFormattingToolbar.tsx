@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import { Bold, CheckSquare2, IndentDecrease, Italic, Link2, List, Pilcrow, Sigma, TableOfContents, Trash2 } from "lucide-react";
+import { Bold, CheckSquare2, ChevronDown, ChevronUp, IndentDecrease, Italic, Link2, List, Paintbrush, Pilcrow, Search, Sigma, TableOfContents } from "lucide-react";
 
 import type { MarkdownEditorPopoverPosition } from "./useMarkdownEditorPopovers";
 
@@ -31,6 +31,7 @@ const codeBlockLanguageOptions = [
 export function MarkdownEditorFormattingToolbar({
   isBoldActive,
   isItalicActive,
+  isOutlineVisible,
   isStrikeActive,
   isHeadingMenuOpen,
   isTableMenuOpen,
@@ -76,6 +77,8 @@ export function MarkdownEditorFormattingToolbar({
   onInsertInlineCode,
   onInsertMath,
   onInsertHorizontalRule,
+  onOpenFindReplace,
+  onToggleOutline,
   onClearFormatting,
   onUpdateTablePicker,
   onClearTablePickerSelection,
@@ -89,6 +92,7 @@ export function MarkdownEditorFormattingToolbar({
 }: {
   isBoldActive: boolean;
   isItalicActive: boolean;
+  isOutlineVisible: boolean;
   isStrikeActive: boolean;
   isHeadingMenuOpen: boolean;
   isTableMenuOpen: boolean;
@@ -134,6 +138,8 @@ export function MarkdownEditorFormattingToolbar({
   onInsertInlineCode: () => void;
   onInsertMath: () => void;
   onInsertHorizontalRule: () => void;
+  onOpenFindReplace: () => void;
+  onToggleOutline: () => void;
   onClearFormatting: () => void;
   onUpdateTablePicker: (rows: number, cols: number) => void;
   onClearTablePickerSelection: () => void;
@@ -187,6 +193,7 @@ export function MarkdownEditorFormattingToolbar({
           <Link2 size={14} />
         </button>
         <button className="markdown-format-toolbar__button" onClick={onInsertImage} title="Image" type="button">IMG</button>
+        <button className="markdown-format-toolbar__button" onClick={onOpenFindReplace} title="Find and replace" type="button"><Search size={14} /></button>
         <button className="markdown-format-toolbar__button" onClick={onInsertToc} title="Insert table of contents" type="button"><TableOfContents size={14} /></button>
         <button className="markdown-format-toolbar__button" onClick={onInsertFootnote} title="Footnote" type="button"><Pilcrow size={14} /></button>
         <span aria-hidden="true" className="markdown-format-toolbar__separator" />
@@ -204,7 +211,17 @@ export function MarkdownEditorFormattingToolbar({
         <span aria-hidden="true" className="markdown-format-toolbar__separator" />
         <button className="markdown-format-toolbar__button" onClick={onInsertHorizontalRule} title="Horizontal rule" type="button">---</button>
         <span aria-hidden="true" className="markdown-format-toolbar__separator" />
-        <button className="markdown-format-toolbar__button" onClick={onClearFormatting} title="Clear formatting" type="button"><Trash2 size={14} /></button>
+        <span aria-hidden="true" className="markdown-format-toolbar__spacer" />
+        <button className="markdown-format-toolbar__button" onClick={onClearFormatting} title="Clear formatting" type="button"><Paintbrush size={14} /></button>
+        <button
+          aria-label={isOutlineVisible ? "Hide outline" : "Show outline"}
+          className={`markdown-format-toolbar__button markdown-format-toolbar__button--outline ${isOutlineVisible ? "is-active" : ""}`.trim()}
+          onClick={onToggleOutline}
+          title={isOutlineVisible ? "Hide outline" : "Show outline"}
+          type="button"
+        >
+          {isOutlineVisible ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
       </div>
       {isHeadingMenuOpen ? (
         <div
