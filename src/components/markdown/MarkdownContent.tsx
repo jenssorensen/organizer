@@ -19,6 +19,9 @@ export function MarkdownContent({
   toolbarActions,
   allowIframeScripts = false,
   useSandboxFrame = false,
+  onSourcePositionSelect,
+  activeSourceLine,
+  focusCurrentBlockOnly = false,
 }: {
   markdown: string;
   noteSourcePath?: string;
@@ -30,6 +33,9 @@ export function MarkdownContent({
   toolbarActions?: ReactNode;
   allowIframeScripts?: boolean;
   useSandboxFrame?: boolean;
+  onSourcePositionSelect?: (sourcePosition: string) => void;
+  activeSourceLine?: number | null;
+  focusCurrentBlockOnly?: boolean;
 }) {
   const theme = useResolvedTheme();
   const hasToolbar = Boolean(toolbarLeading || toolbarActions);
@@ -51,11 +57,15 @@ export function MarkdownContent({
         frameTitle={noteSourcePath ?? "Markdown preview"}
         portalContent={(
           <RenderedMarkdownDocument
+            activeSourceLine={activeSourceLine}
+            allowIframeScripts={allowIframeScripts}
             contentScale={contentScale}
             frameMode
+            focusCurrentBlockOnly={focusCurrentBlockOnly}
             hasToolbar={hasToolbar}
             markdown={markdown}
             noteSourcePath={noteSourcePath}
+            onSourcePositionSelect={onSourcePositionSelect}
             theme={theme}
           />
         )}
@@ -64,10 +74,14 @@ export function MarkdownContent({
   ) : (
     <div className="markdown-body__content" ref={contentRef}>
       <RenderedMarkdownDocument
+        activeSourceLine={activeSourceLine}
+        allowIframeScripts={allowIframeScripts}
         contentScale={contentScale}
+        focusCurrentBlockOnly={focusCurrentBlockOnly}
         hasToolbar={hasToolbar}
         markdown={markdown}
         noteSourcePath={noteSourcePath}
+        onSourcePositionSelect={onSourcePositionSelect}
         theme={theme}
       />
     </div>

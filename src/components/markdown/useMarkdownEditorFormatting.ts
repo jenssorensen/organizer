@@ -1,4 +1,10 @@
-import { useState, type RefObject, type UIEvent } from "react";
+import { useState } from "react";
+
+type EditorSelectionBridge = {
+  focusEditor: () => void;
+  getSelection: () => { selectionStart: number; selectionEnd: number } | null;
+  setSelectionRange: (selectionStart: number, selectionEnd: number) => void;
+};
 
 type TableCursorContext = {
   blockStart: number;
@@ -262,11 +268,11 @@ export function removeTableColumnAtCursorInMarkdown(value: string, selectionStar
 export function useMarkdownEditorFormatting({
   markdown,
   onChange,
-  editorInputRef,
+  editorSelectionBridge,
 }: {
   markdown: string;
   onChange: (value: string) => void;
-  editorInputRef: RefObject<HTMLTextAreaElement | null>;
+  editorSelectionBridge: EditorSelectionBridge;
 }) {
   const [editorSelection, setEditorSelection] = useState(0);
   const [tablePickerRows, setTablePickerRows] = useState(2);
@@ -276,25 +282,19 @@ export function useMarkdownEditorFormatting({
     onChange(nextValue);
 
     window.requestAnimationFrame(() => {
-      const editor = editorInputRef.current;
-      if (!editor) {
-        return;
-      }
-
-      editor.focus();
-      editor.setSelectionRange(nextSelectionStart, nextSelectionEnd);
+      editorSelectionBridge.focusEditor();
+      editorSelectionBridge.setSelectionRange(nextSelectionStart, nextSelectionEnd);
       setEditorSelection(nextSelectionEnd);
     });
   }
 
   function withSelection(transform: (context: SelectionTransformContext) => SelectionTransformResult | null) {
-    const editor = editorInputRef.current;
-    if (!editor) {
+    const selection = editorSelectionBridge.getSelection();
+    if (!selection) {
       return;
     }
 
-    const selectionStart = editor.selectionStart;
-    const selectionEnd = editor.selectionEnd;
+    const { selectionStart, selectionEnd } = selection;
     const selectedText = markdown.slice(selectionStart, selectionEnd);
     const next = transform({ value: markdown, selectionStart, selectionEnd, selectedText });
     if (!next) {
@@ -328,13 +328,12 @@ export function useMarkdownEditorFormatting({
   }
 
   function isSelectionWrapped(prefix: string, suffix: string) {
-    const editor = editorInputRef.current;
-    if (!editor) {
+    const selection = editorSelectionBridge.getSelection();
+    if (!selection) {
       return false;
     }
 
-    const selectionStart = editor.selectionStart;
-    const selectionEnd = editor.selectionEnd;
+    const { selectionStart, selectionEnd } = selection;
     const selectedText = markdown.slice(selectionStart, selectionEnd);
 
     if (
@@ -485,6 +484,11 @@ export function useMarkdownEditorFormatting({
     }
 
     insertAtCursor(`\n\`\`\`${language}\n\n\`\`\`\n`, 4 + language.length);
+  }
+
+  function insertCallout(kind: "note" | "tip" | "warning") {
+    const title = kind === "tip" ? "Tip" : kind === "warning" ? "Warning" : "Note";
+    insertAtCursor(`> [!${kind.toUpperCase()}] ${title}\n> \n`, `> [!${kind.toUpperCase()}] ${title}\n> `.length);
   }
 
   function applyHeading(level: number) {
@@ -640,8 +644,8 @@ export function useMarkdownEditorFormatting({
     });
   }
 
-  function handleEditorCursorActivity(event: UIEvent<HTMLTextAreaElement>) {
-    setEditorSelection(event.currentTarget.selectionStart);
+  function handleEditorCursorActivity(selectionStart: number) {
+    setEditorSelection(selectionStart);
   }
 
   const cursorTableContext = getTableCursorContext(markdown, editorSelection);
@@ -667,6 +671,7 @@ export function useMarkdownEditorFormatting({
     clearFormatting,
     insertLinkWithUrl,
     insertCodeBlockWithLanguage,
+    insertCallout,
     prefixSelectedLines,
     insertAtCursor,
     applyHeading,

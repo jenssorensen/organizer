@@ -26,6 +26,8 @@ import {
   QuickCaptureDialog,
   NOTE_TEMPLATES,
 } from "./components/Dialogs";
+import { clearMarkdownEditorDraft, loadMarkdownEditorDraft, saveMarkdownEditorDraft } from "./components/markdown/markdownEditorDraftStorage";
+import { rewriteMarkdownLinksForRename } from "./components/markdown/markdownEditorUtils";
 import { NoteFolderOverviewPanel, NoteListCard, RecentDocumentCard } from "./components/NoteComponents";
 import { DailyNoteNavigator, TrashPanel, WorkspaceSwitcher } from "./components/notes/NotePanels";
 import { TodoWorkspace } from "./components/TodoComponents";
@@ -176,6 +178,7 @@ const STORED_SIDEBAR_COLLAPSED_KEY = "organizer:sidebar-collapsed";
 const STORED_BOOKMARK_RENDER_MODE_KEY = "organizer:bookmark-render-mode";
 const STORED_BOOKMARK_COMPACT_MODE_KEY = "organizer:bookmark-compact-mode";
 const STORED_BOOKMARK_EXPANDED_FOLDERS_KEY = "organizer:bookmark-expanded-folders";
+const MARKDOWN_EDITOR_DRAFT_AUTOSAVE_DELAY_MS = 850;
 
 const SYNC_INTERVAL_OPTIONS: { label: string; value: number }[] = [
   { label: "Off", value: 0 },
@@ -564,6 +567,7 @@ function App() {
   const [pendingEditorScrollRatio, setPendingEditorScrollRatio] = useState(0);
   const [noteSaveState, setNoteSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [noteSaveError, setNoteSaveError] = useState<string | null>(null);
+  const [editorDraftStatus, setEditorDraftStatus] = useState<"idle" | "autosaved" | "recovered">("idle");
   const [isUnsavedCloseDialogOpen, setIsUnsavedCloseDialogOpen] = useState(false);
   const [bookmarkDialog, setBookmarkDialog] = useState<BookmarkDialogState>({ kind: "closed" });
   const [noteCreationDialog, setNoteCreationDialog] = useState<NoteCreationDialogState>({ kind: "closed" });
@@ -2075,10 +2079,27 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
     };
   }, []);
 
+  function isMarkdownEditorAutocompleteEscapeTarget(eventTarget: EventTarget | null) {
+    if (!(eventTarget instanceof Element)) {
+      return false;
+    }
+
+    const editorInput = eventTarget.closest(".markdown-editor__input");
+    if (!editorInput) {
+      return false;
+    }
+
+    return editorInput.querySelector(".cm-tooltip-autocomplete") !== null;
+  }
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       const isEscapeKey = event.key === "Escape" || event.key === "Esc" || event.code === "Escape";
       const isMod = event.metaKey || event.ctrlKey;
+
+      if (isEscapeKey && isMarkdownEditorAutocompleteEscapeTarget(event.target)) {
+        return;
+      }
 
       // Close command palette with Escape
       if (isEscapeKey && isCommandPaletteOpen) {
@@ -2774,17 +2795,27 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
     }
 
     setPendingEditorScrollRatio(selectedNote?.id === note.id ? getScrollProgress(viewerContentRef.current) : 0);
-    setNoteDraft(note.content);
+    const recoveredDraft = note.sourcePath ? loadMarkdownEditorDraft(note.sourcePath) : null;
+    const recoveredContent = recoveredDraft && recoveredDraft.content !== note.content ? recoveredDraft.content : null;
+    setNoteDraft(recoveredContent ?? note.content);
     setNoteSaveError(null);
     setNoteSaveState("idle");
+    setEditorDraftStatus(recoveredContent ? "recovered" : "idle");
+    if (recoveredContent) {
+      setNotesStatus(`Recovered local draft for ${note.title}`);
+    }
     setIsNoteEditing(true);
   }
 
   function handleCancelNoteEditing() {
+    if (selectedNote?.sourcePath) {
+      clearMarkdownEditorDraft(selectedNote.sourcePath);
+    }
     setIsUnsavedCloseDialogOpen(false);
     setNoteDraft(selectedNote?.content ?? "");
     setNoteSaveError(null);
     setNoteSaveState("idle");
+    setEditorDraftStatus("idle");
     setIsNoteEditing(false);
   }
 
@@ -2905,6 +2936,10 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
           ? findNoteTreeNodeIdByNoteId(notesData.tree, renamedNote.id)
           : null;
 
+      const updatedWikiLinkCount = renamedNote
+        ? await rewriteWikiLinksForRenamedNote(note, renamedNote, notesData?.notes ?? allNotes)
+        : 0;
+
       if (targetNodeId) {
         navigateNoteSelection(targetNodeId, "notes");
       } else if (notesNavigationMode === "section" && activeNoteSection?.id) {
@@ -2912,11 +2947,53 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
         navigateNoteSelection(activeNoteSection.id, "notes");
       }
 
-      setNotesStatus(`Renamed to ${data.fileName}`);
+      setNotesStatus(updatedWikiLinkCount > 0 ? `Renamed to ${data.fileName} and updated ${updatedWikiLinkCount} links` : `Renamed to ${data.fileName}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to rename note file";
       window.alert(message);
     }
+  }
+
+  async function rewriteWikiLinksForRenamedNote(previousNote: Note, renamedNote: Note, notesSnapshot: Note[]) {
+    const previousTitle = previousNote.title.trim() || undefined;
+    const nextTitle = renamedNote.title.trim() || undefined;
+    const previousFileName = getNoteSourceFileName(previousNote) || undefined;
+    const nextFileName = getNoteSourceFileName(renamedNote) || undefined;
+
+    if (
+      previousTitle === nextTitle
+      && previousFileName === nextFileName
+    ) {
+      return 0;
+    }
+
+    let updatedCount = 0;
+
+    for (const currentNote of notesSnapshot) {
+      const currentContent = isNoteEditing && selectedNote?.id === currentNote.id ? noteDraft : currentNote.content;
+      const nextContent = rewriteMarkdownLinksForRename(currentContent, {
+        previousTitle,
+        nextTitle,
+        previousFileName,
+        nextFileName,
+      });
+      if (nextContent === currentContent) {
+        continue;
+      }
+
+      if (isNoteEditing && selectedNote?.id === currentNote.id) {
+        setNoteDraft(nextContent);
+        updatedCount += 1;
+        continue;
+      }
+
+      const result = await saveNoteContent(currentNote, nextContent);
+      if (result.ok) {
+        updatedCount += 1;
+      }
+    }
+
+    return updatedCount;
   }
 
   async function handleSaveNoteEdits() {
@@ -2954,6 +3031,8 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
 
         throw new Error(result.error ?? "Failed to save note");
       }
+      clearMarkdownEditorDraft(selectedNote.sourcePath);
+      setEditorDraftStatus("idle");
       setNoteSaveState("saved");
       setNotesStatus("queued" in result && result.queued ? `${selectedNote.title} queued for sync` : `Saved ${selectedNote.title}`);
       window.setTimeout(() => setNoteSaveState((current) => (current === "saved" ? "idle" : current)), 1400);
@@ -2966,6 +3045,29 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
       return false;
     }
   }
+
+  useEffect(() => {
+    if (!isNoteEditing || !selectedNote?.sourcePath) {
+      return;
+    }
+
+    if (noteDraft === selectedNote.content) {
+      clearMarkdownEditorDraft(selectedNote.sourcePath);
+      if (editorDraftStatus === "autosaved") {
+        setEditorDraftStatus("idle");
+      }
+      return;
+    }
+
+    const autosaveTimer = window.setTimeout(() => {
+      saveMarkdownEditorDraft(selectedNote.sourcePath!, noteDraft);
+      setEditorDraftStatus((current) => current === "recovered" ? "recovered" : "autosaved");
+    }, MARKDOWN_EDITOR_DRAFT_AUTOSAVE_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(autosaveTimer);
+    };
+  }, [editorDraftStatus, isNoteEditing, noteDraft, selectedNote]);
 
   async function persistSidebarOrder(nextOrder: SectionId[]) {
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -3177,6 +3279,28 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
 
   function handleNoteCreationDialogTemplateChange(templateId: string) {
     setNoteCreationDialog((current) => (current.kind !== "document" ? current : { ...current, selectedTemplate: templateId }));
+  }
+
+  async function handleCreateMissingLinkedNote(linkLabel: string) {
+    if (section !== "notes") {
+      return;
+    }
+
+    const requestedName = linkLabel.trim();
+    if (!requestedName) {
+      return;
+    }
+
+    const targetPath = selectedNote?.sourcePath
+      ? getParentSourcePath(selectedNote.sourcePath)
+      : noteCreationTarget?.sourcePath ?? "";
+
+    const result = await createNoteDocument(targetPath, requestedName);
+    if (!result.ok) {
+      return;
+    }
+
+    setNotesStatus(`Created ${result.fileName} for [[${requestedName}]]`);
   }
 
   async function handleNoteCreationDialogConfirm() {
@@ -5021,13 +5145,18 @@ ${featuredBookmark.tags.length ? featuredBookmark.tags.map((tag) => `- #${tag}`)
                           <Suspense fallback={<div className="muted">Loading editor...</div>}>
                             <MarkdownEditor
                               allowIframeScripts={prefs.allowIframeScripts}
+                              backlinks={prefs.showBacklinks ? backlinks : []}
                               canSave={isNoteDraftDirty}
                               documentPath={selectedNote.sourcePath || selectedNote.title}
+                              draftStatus={editorDraftStatus}
                               noteSourcePath={selectedNote.sourcePath}
                               initialScrollRatio={pendingEditorScrollRatio}
                               markdown={noteDraft}
+                              notes={allNotes}
                               onClose={() => void handleCloseNoteEditor()}
                               onChange={setNoteDraft}
+                              onCreateMissingNote={(label) => void handleCreateMissingLinkedNote(label)}
+                              onOpenBacklink={openNote}
                               onZoomIn={handleViewerZoomIn}
                               onZoomOut={handleViewerZoomOut}
                               onSave={handleSaveNoteEdits}

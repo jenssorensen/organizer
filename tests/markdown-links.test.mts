@@ -24,4 +24,8 @@ test("app uses markdown link attributes helper", async () => {
   const renderedMarkdownSource = await readFile(new URL("../src/components/markdown/RenderedMarkdownDocument.tsx", import.meta.url), "utf8");
 
   assert.match(renderedMarkdownSource, /getMarkdownLinkAttributes/);
+  assert.match(renderedMarkdownSource, /parseMarkdownEmbedDirective/);
+  assert.match(renderedMarkdownSource, /resolveMarkdownEmbed/);
+  assert.match(renderedMarkdownSource, /function ExternalMediaEmbed/);
+  assert.match(renderedMarkdownSource, /sandbox=\{\[/);
 });
