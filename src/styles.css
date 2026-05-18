@@ -2915,7 +2915,7 @@ button.note-breadcrumbs__item:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 10px 12px;
 }
 
 .markdown-editor__input .cm-search label {
@@ -2924,27 +2924,38 @@ button.note-breadcrumbs__item:hover {
   gap: 6px;
   color: var(--muted);
   font: 600 0.82rem/1.2 var(--font-sans);
+  min-height: 34px;
 }
 
-.markdown-editor__input .cm-search input {
+.markdown-editor__input .cm-search input:not([type="checkbox"]) {
   min-width: 180px;
-  min-height: 32px;
+  min-height: 34px;
   padding: 6px 10px;
   border: 1px solid rgba(136, 167, 209, 0.16);
-  border-radius: 8px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.02);
   color: var(--text);
   font: 0.9rem var(--font-mono);
+  box-sizing: border-box;
+}
+
+.markdown-editor__input .cm-search input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent-warm);
+  flex: 0 0 auto;
 }
 
 .markdown-editor__input .cm-search button {
-  min-height: 32px;
+  min-height: 34px;
   padding: 6px 12px;
   border: 1px solid rgba(136, 167, 209, 0.16);
-  border-radius: 8px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);
   color: var(--text);
   font: 600 0.82rem/1 var(--font-sans);
+  box-sizing: border-box;
 }
 
 .markdown-editor__input .cm-search button:hover,
@@ -2952,6 +2963,15 @@ button.note-breadcrumbs__item:hover {
   border-color: rgba(120, 230, 198, 0.32);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   outline: none;
+}
+
+.markdown-editor__input .cm-search button[name="close"] {
+  margin-left: auto;
+  min-width: 34px;
+  width: 34px;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .markdown-editor__input .cm-tooltip-autocomplete > ul {
