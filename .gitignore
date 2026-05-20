@@ -3,3 +3,7 @@ dist/
 node_modules/
 .organizer-data/
 .organizer-config.json
+.vite/
+
+.orchestrator/
+.worktrees/
